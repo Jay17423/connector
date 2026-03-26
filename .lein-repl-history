@@ -1,0 +1,2 @@
+(require 'connector.example)
+(connector.example/run-example)

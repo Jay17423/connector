@@ -1,0 +1,62 @@
+{:server
+ {:port
+  {:description "HTTP server port"
+   :type :long
+   :default 3000}}
+
+ :spark
+ {:app
+  {:name
+   {:description "Spark application name"
+    :type :string
+    :required true}
+
+   :master-url
+   {:description "Spark master url (local or cluster)"
+    :type :string
+    :required true}}
+
+  :sql
+  {:shuffle-partitions
+   {:description "Number of shuffle partitions"
+    :type :long
+    :default 4}}
+
+  :datasets
+  {:sample-csv
+   {:type
+    {:description "Dataset source type"
+     :type :keyword
+     :required true}
+
+    :cred
+    {:json-path 
+     {:description "Path to Google Service Account JSON file"
+      :type :string
+      :required false}}
+
+    :format
+    {:description "Dataset file format"
+     :type :keyword
+     :required true}
+
+    :path
+    {:description "Dataset file path (Local Path or GDrive File ID)"
+     :type :string
+     :required true}
+
+    :options
+    {:header
+     {:description "CSV header present"
+      :type :boolean
+      :default true}
+
+     :delimiter
+     {:description "CSV delimiter"
+      :type :string
+      :default ","}
+
+     :quote
+     {:description "CSV quote character"
+      :type :string
+      :default "\""}}}}}}

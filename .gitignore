@@ -1,0 +1,94 @@
+# =========================
+# Clojure / JVM
+# =========================
+/target
+/.cpcache
+/.rebel_readline_history
+/.nrepl-port
+/.shadow-cljs
+/.lein-failures
+/.lein-plugins
+/.eastwood
+/.clj-kondo/.cache
+.lsp/                 # language server cache (VERY IMPORTANT)
+.cursive/             # IntelliJ Cursive cache
+/.calva/
+
+# =========================
+# Spark / Big Data temp
+# =========================
+spark-warehouse/
+metastore_db/
+*.parquet
+*.orc
+
+# =========================
+# Build & class files
+# =========================
+*.class
+*.jar
+*.war
+*.ear
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+log/
+
+# =========================
+# Config / Secrets
+# =========================
+config.edn
+config/*.edn
+.env
+.env.*
+*.keystore
+*.jks
+*.p12
+credentials.edn
+
+# =========================
+# OS / Editor junk
+# =========================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# =========================
+# Node (if frontend / tooling)
+# =========================
+node_modules/
+dist/
+build/
+
+# =========================
+# Temp / Backup files
+# =========================
+*~
+*.swp
+*.tmp
+*.bak
+
+# =========================
+# Test coverage / reports
+# =========================
+coverage/
+reports/
+
+# =========================
+# Data files (optional - if large)
+# =========================
+data/
+datasets/
+*.csv
+*.tsv
+*.json
+
+# =========================
+# Local mount points (if using gdrive mount)
+# =========================
+/mnt/.lsp/

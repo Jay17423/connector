@@ -1,32 +1,34 @@
 (ns connector.dataset
   (:require
-   [flambo.sql :as fsql]
-   [taoensso.timbre :as log]))
+   [flambo.sql        :as fsql]
+   [connector.gdrive  :as gdrive]
+   [taoensso.timbre   :as log]))
 
+(defmulti ^:private resolve-source
+  (fn [config] (:type config)))
 
-(defn resolve-path
-  [{:keys [type path cred]}]
+(defmethod resolve-source :local
+  [{:keys [path]}]
+  [path false])
 
-  (case type
+(defmethod resolve-source :gdrive
+  [{:keys [cred options]}]
+  [(gdrive/fetch-and-clean! cred options) true])
 
-    :local path
-    (throw
-     (ex-info "Unsupported source"
-              {:type type}))))
-
+(defmethod resolve-source :default
+  [{:keys [type]}]
+  (throw (ex-info "Unsupported dataset source type"
+                  {:type      type
+                   :supported [:local :gdrive]})))
 
 (defn read-dataset
   [spark {:keys [options] :as config}]
-
-  (let [resolved-path
-        (resolve-path config)]
-
-    (log/info
-     {:msg "reading csv dataset"
-      :metric {:path resolved-path}})
-
-    (fsql/read-csv
-     spark
-     resolved-path
-     :header (:header options)
-     :delimiter (:delimiter options))))
+  (let [[path temp?] (resolve-source config)]
+    (log/info {:msg    "reading csv dataset into Spark"
+               :metric {:type  (:type config)
+                        :path  path
+                        :temp? temp?}})
+    (fsql/read-csv spark
+                   path
+                   :header    (:header options true)
+                   :delimiter (:delimiter options ","))))

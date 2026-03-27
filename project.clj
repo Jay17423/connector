@@ -23,13 +23,12 @@
                  [com.taoensso/timbre "6.8.0"]
                  [yieldbot/serializable-fn "0.1.3"]
                  [yieldbot/flambo "0.9.0-SNAPSHOT"]
+                 ;; CSV parsing for single-pass clean
+                 [org.clojure/data.csv "1.1.0"]
                  [com.fasterxml.jackson.core/jackson-core "2.15.2"]
                  [com.fasterxml.jackson.core/jackson-databind "2.15.2"]
                  [com.fasterxml.jackson.core/jackson-annotations "2.15.2"]
-                 [com.fasterxml.jackson.module/jackson-module-scala_2.12 "2.15.2"] 
-                 [com.google.api-client/google-api-client "2.2.0"]
-                 [com.google.apis/google-api-services-drive "v3-rev20230822-2.0.0"]
-                 [com.google.auth/google-auth-library-oauth2-http "1.19.0"]]
+                 [com.fasterxml.jackson.module/jackson-module-scala_2.12 "2.15.2"]]
 
   :plugins [[lein-ring "0.12.5"]
             [lein-cljfmt "0.9.2"]

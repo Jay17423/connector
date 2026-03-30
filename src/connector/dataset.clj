@@ -1,34 +1,41 @@
 (ns connector.dataset
-  (:require
-   [flambo.sql        :as fsql]
-   [connector.gdrive  :as gdrive]
-   [taoensso.timbre   :as log]))
+  "Loads CSV datasets into Spark from local or Google Drive."
+  (:require [flambo.sql       :as fsql]
+            [connector.gdrive :as gdrive]
+            [taoensso.timbre  :as log]))
 
-(defmulti ^:private resolve-source
-  (fn [config] (:type config)))
+(defn resolve-source
+  "Returns file path; downloads if source is Google Drive."
+  [config]
+  (let [{:keys [type path cred options]} config]
+    (cond
+      (= type :local)
+      [path false]
 
-(defmethod resolve-source :local
-  [{:keys [path]}]
-  [path false])
+      (= type :gdrive)
+      [(gdrive/fetch-and-clean! cred options) true]
 
-(defmethod resolve-source :gdrive
-  [{:keys [cred options]}]
-  [(gdrive/fetch-and-clean! cred options) true])
-
-(defmethod resolve-source :default
-  [{:keys [type]}]
-  (throw (ex-info "Unsupported dataset source type"
-                  {:type      type
-                   :supported [:local :gdrive]})))
+      :else
+      (throw
+       (ex-info
+        "Unsupported dataset source type"
+        {:type      type
+         :supported [:local :gdrive]})))))
 
 (defn read-dataset
+  "Reads CSV into Spark DataFrame using Flambo."
   [spark {:keys [options] :as config}]
   (let [[path temp?] (resolve-source config)]
-    (log/info {:msg    "reading csv dataset into Spark"
-               :metric {:type  (:type config)
-                        :path  path
-                        :temp? temp?}})
-    (fsql/read-csv spark
-                   path
-                   :header    (:header options true)
-                   :delimiter (:delimiter options ","))))
+    (log/info
+     {:msg "reading csv dataset into Spark"
+      :metric
+      {:type  (:type config)
+       :path  path
+       :temp? temp?}})
+
+    (fsql/read-csv
+     spark
+     path
+     :header    (:header options true)
+     :delimiter (:delimiter options ",")
+     :mode "PERMISSIVE")))

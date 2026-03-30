@@ -42,9 +42,20 @@
      :required    false}
 
     :cred
-    {:description "Credentials map (empty for :local)"
-     :type        :map
-     :required    false}
+    {:link
+      {:description "Google Drive share URL"
+       :type        :string
+       :required    true}
+
+ :token
+ {:description "OAuth2 Bearer token"
+  :type        :string
+  :required    true}
+
+ :revision-id
+ {:description "Optional Drive revision id"
+  :type        :string
+  :required    false}}
 
     :options
     {:header

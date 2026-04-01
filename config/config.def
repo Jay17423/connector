@@ -1,117 +1,20 @@
 {:server
- {:port
-  {:description "HTTP server port"
-   :type        :long
-   :default     3000}}
+ {:port {:description "HTTP server port"
+         :type        :long
+         :default     3000}}
 
  :spark
-
  {:app
-  {:name
-   {:description "Spark application name"
-    :type        :string
-    :required    true}
+  {:name {:description "Spark application name"
+          :type        :string
+          :required    true}
 
-   :master-url
-   {:description "Spark master URL"
-    :type        :string
-    :required    true}}
+   :master-url {:description "Spark master URL"
+                :type        :string
+                :required    true}}
 
   :sql
   {:shuffle-partitions
    {:description "Number of shuffle partitions"
     :type        :long
-    :default     4}}
-
-  :datasets
-
-  {:sample-csv
-   {:type
-    {:description "Source type: :local or :gdrive"
-     :type        :keyword
-     :required    true}
-
-    :format
-    {:description "File format: :csv"
-     :type        :keyword
-     :required    true}
-
-    :path
-    {:description "Absolute or relative path (only for :local)"
-     :type        :string
-     :required    false}
-
-    :cred
-    {:link
-      {:description "Google Drive share URL"
-       :type        :string
-       :required    true}
-
- :token
- {:description "OAuth2 Bearer token"
-  :type        :string
-  :required    true}
-
- :revision-id
- {:description "Optional Drive revision id"
-  :type        :string
-  :required    false}}
-
-    :options
-    {:header
-     {:description "CSV has a header row"
-      :type        :boolean
-      :default     true}
-
-     :delimiter
-     {:description "CSV column delimiter"
-      :type        :string
-      :default     ","}
-
-     :quote-char
-     {:description "CSV quote character"
-      :type        :string
-      :default     "\""}}}
-
-   :gdrive-employees
-   {:type
-    {:description "Source type: must be :gdrive"
-     :type        :keyword
-     :required    true}
-
-    :format
-    {:description "File format: :csv"
-     :type        :keyword
-     :required    true}
-
-    :cred
-    {:link
-     {:description "Google Drive share URL (any standard format)"
-      :type        :string
-      :required    true}
-
-     :token
-     {:description "OAuth2 Bearer token with Drive read scope"
-      :type        :string
-      :required    true}
-
-     :version
-     {:description "Drive API version: :v3 (default) or :v2"
-      :type        :keyword
-      :default     :v3}}
-
-    :options
-    {:header
-     {:description "CSV has a header row"
-      :type        :boolean
-      :default     true}
-
-     :delimiter
-     {:description "CSV column delimiter"
-      :type        :string
-      :default     ","}
-
-     :quote-char
-     {:description "CSV quote character"
-      :type        :string
-      :default     "\""}}}}}}
+    :default     4}}}}

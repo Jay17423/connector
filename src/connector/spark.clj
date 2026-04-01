@@ -23,13 +23,10 @@
 
 (defstate session
   :start
-  (do
-    (log/info "starting spark session")
-    (try
-      (create-session)
-      (catch Exception e
-        (throw e))))
+  (do (log/info "starting spark session")
+      (try (create-session)
+           (catch Exception e
+             (throw e))))
   :stop
-  (do
-    (log/info "stopping spark session")
-    (.stop session)))
+  (do (log/info "stopping spark session")
+      (.stop session)))

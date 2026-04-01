@@ -38,8 +38,7 @@
       (log/info {:msg "dataset load request"
                  :metric {:type (:type body)}})
 
-      (let [config (normalize-body body)
-            
+      (let [config (normalize-body body) 
             df (ds/read-dataset session config)
             preview (util/df->json-preview df)
             duration (- (System/currentTimeMillis) start-time)]

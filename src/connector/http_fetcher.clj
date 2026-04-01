@@ -1,7 +1,6 @@
 (ns connector.http-fetcher
-  "Generalized downloader for cloud sources with streaming clean logic."
-  (:require [clojure.data.csv :as csv]
-            [clojure.java.io :as io]
+  "Downloader for cloud sources (no manual CSV cleaning)."
+  (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [taoensso.timbre :as log])
   (:import [java.io File]
@@ -22,83 +21,129 @@
 
 (defn- extract-gdrive-id [url]
   (or (some (fn [pat]
-              (when-let [m (re-find pat url)] (second m)))
+              (when-let [m (re-find pat url)]
+                (second m)))
             [#"/file/d/([a-zA-Z0-9_-]+)"
              #"[?&]id=([a-zA-Z0-9_-]+)"
              #"/open\\?id=([a-zA-Z0-9_-]+)"])
-      (throw (ex-info "Cannot extract Drive file ID" {:url url}))))
+      (throw (ex-info "Cannot extract Drive file ID"
+                      {:url url}))))
 
-(defn build-url
-  "Transforms user link into a direct download stream link based on source 
-   type."
-  [type link revision-id]
-  (case type
-    :gdrive (let [id (extract-gdrive-id link)]
-              (if revision-id
-                (str "https://www.googleapis.com/drive/v3/files/" 
-                     id "/revisions/" 
-                     revision-id "?alt=media")
-                (str "https://www.googleapis.com/drive/v3/files/" 
-                     id "?alt=media")))
-    :dropbox (if (str/includes? link "?")
-               (str/replace link #"\?dl=0" "?dl=1")
-               (str link "?dl=1"))
-    link)) ;; S3/GCS/Others use the link as-is
+(defn- force-dropbox-dl
+  [link]
+  (cond
+    ;; replace preview mode
+    (str/includes? link "dl=")
+    (str/replace link #"dl=0" "dl=1")
 
-(defn stream-clean-to-file!
-  "Streams CSV, removes BOM + empty rows and writes to local temp file."
-  [input-stream dest-path {:keys [delimiter quote-char]
-                           :or {delimiter "," quote-char \"}}]
-  (let [sep (first delimiter)
-        qc (if (char? quote-char)
-             quote-char
-             (first (str quote-char)))]
-    (with-open [rdr (io/reader input-stream)
-                wtr (io/writer dest-path)]
-      (let [[hdr & rows] (csv/read-csv rdr :separator sep :quote qc)
-            header (when hdr
-                     (assoc hdr 0
-                            (let [v (first hdr)]
-                              (if (and v (= (first v) \uFEFF))
-                                (subs v 1)
-                                v))))
-            clean-rows (remove (fn [row]
-                                 (every?
-                                  (fn [col]
-                                    (str/blank? (or col "")))
-                                  row))
-                               rows)]
-        (csv/write-csv wtr
-                       (cons header clean-rows)
-                       :separator sep :quote qc)))))
+    ;; append param
+    (str/includes? link "?")
+    (str link "&dl=1")
 
-(defn fetch-and-clean!
-  "Generalized fetcher for all cloud sources."
-  [type {:keys [link token revision-id]} options]
-  (let [url (build-url type link revision-id)
+    :else
+    (str link "?dl=1")))
+
+(defn build-gdrive-request
+  [link revision-id]
+
+  (let [id (extract-gdrive-id link)]
+
+    {:url (if revision-id
+            (str "https://www.googleapis.com/drive/v3/files/"
+                 id
+                 "/revisions/"
+                 revision-id
+                 "?alt=media")
+
+            (str "https://www.googleapis.com/drive/v3/files/"
+                 id
+                 "?alt=media"))
+     :method :get
+     :headers {}}))
+
+(defn build-dropbox-request
+  [link token revision-id]
+  (cond
+    ;; revision download
+    revision-id
+    {:url "https://content.dropboxapi.com/2/files/download"
+     :method :post
+     :headers {"Dropbox-API-Arg"
+               (str "{\"path\":\"rev:" revision-id "\"}")}}
+
+    ;; private file latest version
+    (not (str/blank? token))
+    {:url "https://content.dropboxapi.com/2/files/download"
+     :method :post
+     :headers {"Dropbox-API-Arg"
+               (str "{\"path\":\"" link "\"}")}}
+
+    ;; public share link
+    :else
+    {:url (force-dropbox-dl link)
+     :method :get
+     :headers {}}))
+
+;;;; main downloader
+
+(defn fetch-file!
+  [type {:keys [link token revision-id]}]
+  (let [{:keys [url method headers]}
+        (case type
+          :gdrive (build-gdrive-request link revision-id)
+
+          :dropbox (build-dropbox-request link token revision-id)
+
+          {:url link
+           :method :get
+           :headers {}})
+        
         dest (str (System/getProperty "java.io.tmpdir")
-                  File/separator "cloud-clean-" (UUID/randomUUID) ".csv")]
-    
-    (log/info {:msg "starting cloud stream-download + clean" 
-               :metric {:type type :url url :dest dest}})
-    
-    (let [req-builder (HttpRequest/newBuilder)
-          _ (.uri req-builder (URI/create url))
-          _ (.timeout req-builder (Duration/ofSeconds 120))
-          _ (when (not (str/blank? token))
-              (.header 
-               req-builder "Authorization" (str "Bearer " token)))
-          request (.build
-                   (.GET req-builder))
-          response (.send http-client
-                          request
-                          (HttpResponse$BodyHandlers/ofInputStream))
-          status (.statusCode response)]
-      (when (or (< status 200) (>= status 300))
-        (throw (ex-info
-                "Cloud download request failed"
-                {:status status :url url :type type})))
-      (with-open [body-stream (.body response)]
-        (stream-clean-to-file! body-stream dest options)))
+                  File/separator
+                  "cloud-raw-"
+                  (UUID/randomUUID)
+                  ".csv")]
+    (log/info
+     {:msg "starting cloud download"
+      :metric {:type type :url url :dest dest}})
+    (let [req-builder (HttpRequest/newBuilder)]
+      (.uri req-builder (URI/create url))
+      (.timeout req-builder
+                (Duration/ofSeconds 120))
+      ;; common auth header (works for gdrive + dropbox)
+      (when (not (str/blank? token))
+        (.header req-builder
+                 "Authorization"
+                 (str "Bearer " token)))
+      ;; provider specific headers
+      (doseq [[k v] headers]
+        (.header req-builder k v))
+      (let [request (if (= method :post)
+                      (.build
+                       (.POST
+                        req-builder
+                        (java.net.http.HttpRequest$BodyPublishers/noBody)))
+                      (.build
+                       (.GET req-builder)))
+            response (.send
+                      http-client
+                      request
+                      (HttpResponse$BodyHandlers/ofInputStream))
+
+            status (.statusCode
+                    response)]
+        (when (or (< status 200) (>= status 300))
+          (throw (ex-info
+                  "Cloud download failed"
+                  {:status status
+                   :url url
+                   :type type})))
+
+        (with-open [in (.body response)
+                    out (io/output-stream dest)]
+
+          (io/copy in out))))
+
     (.deleteOnExit (File. dest))
+
     dest))

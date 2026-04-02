@@ -19,15 +19,15 @@
       (.followRedirects HttpClient$Redirect/NORMAL)
       (.build)))
 
-(defn- extract-gdrive-id [url]
+(defn- extract-gdrive-id
+  [url]
   (or (some (fn [pat]
               (when-let [m (re-find pat url)]
                 (second m)))
             [#"/file/d/([a-zA-Z0-9_-]+)"
              #"[?&]id=([a-zA-Z0-9_-]+)"
              #"/open\\?id=([a-zA-Z0-9_-]+)"])
-      (throw (ex-info "Cannot extract Drive file ID"
-                      {:url url}))))
+      (throw (ex-info "Cannot extract Drive file ID" {:url url}))))
 
 (defn- force-dropbox-dl
   [link]
@@ -45,9 +45,7 @@
 
 (defn build-gdrive-request
   [link revision-id]
-
   (let [id (extract-gdrive-id link)]
-
     {:url (if revision-id
             (str "https://www.googleapis.com/drive/v3/files/"
                  id
@@ -84,66 +82,65 @@
      :method :get
      :headers {}}))
 
-;;;; main downloader
-
+;; main downloader
 (defn fetch-file!
-  [type {:keys [link token revision-id]}]
-  (let [{:keys [url method headers]}
-        (case type
-          :gdrive (build-gdrive-request link revision-id)
+  [type {:keys [link token revision-id] :as cred}]
 
-          :dropbox (build-dropbox-request link token revision-id)
+  (if (= type :s3)
+    ((str "s3a://" (:bucket cred) "/" (:key cred)))
+    (let [{:keys [url method headers]}
+          (case type
+            :gdrive (build-gdrive-request link revision-id)
 
-          {:url link
-           :method :get
-           :headers {}})
-        
-        dest (str (System/getProperty "java.io.tmpdir")
-                  File/separator
-                  "cloud-raw-"
-                  (UUID/randomUUID)
-                  ".csv")]
-    (log/info
-     {:msg "starting cloud download"
-      :metric {:type type :url url :dest dest}})
-    (let [req-builder (HttpRequest/newBuilder)]
-      (.uri req-builder (URI/create url))
-      (.timeout req-builder
-                (Duration/ofSeconds 120))
-      ;; common auth header (works for gdrive + dropbox)
-      (when (not (str/blank? token))
-        (.header req-builder
-                 "Authorization"
-                 (str "Bearer " token)))
-      ;; provider specific headers
-      (doseq [[k v] headers]
-        (.header req-builder k v))
-      (let [request (if (= method :post)
-                      (.build
-                       (.POST
-                        req-builder
-                        (java.net.http.HttpRequest$BodyPublishers/noBody)))
-                      (.build
-                       (.GET req-builder)))
-            response (.send
-                      http-client
-                      request
-                      (HttpResponse$BodyHandlers/ofInputStream))
+            :dropbox (build-dropbox-request link token revision-id)
 
-            status (.statusCode
-                    response)]
-        (when (or (< status 200) (>= status 300))
-          (throw (ex-info
-                  "Cloud download failed"
-                  {:status status
-                   :url url
-                   :type type})))
+            {:url link
+             :method :get
+             :headers {}})
 
-        (with-open [in (.body response)
-                    out (io/output-stream dest)]
+          dest (str (System/getProperty "java.io.tmpdir")
+                    File/separator
+                    "cloud-raw-"
+                    (UUID/randomUUID)
+                    ".csv")]
+      (log/info
+       {:msg "starting cloud download"
+        :metric {:type type :url url :dest dest}})
 
-          (io/copy in out))))
+      (let [req-builder (HttpRequest/newBuilder)]
+        (.uri req-builder (URI/create url))
+        (.timeout req-builder
+                  (Duration/ofSeconds 120))
+        (when (not (str/blank? token))
+          (.header req-builder
+                   "Authorization"
+                   (str "Bearer " token)))
+        (doseq [[k v] headers]
+          (.header req-builder k v))
+        (let [request (if (= method :post)
+                        (.build
+                         (.POST
+                          req-builder
+                          (java.net.http.HttpRequest$BodyPublishers/noBody)))
+                        (.build
+                         (.GET req-builder)))
 
-    (.deleteOnExit (File. dest))
+              response (.send
+                        http-client
+                        request
+                        (HttpResponse$BodyHandlers/ofInputStream))
 
-    dest))
+              status (.statusCode response)]
+
+          (when (or (< status 200) (>= status 300))
+            (throw (ex-info
+                    "Cloud download failed"
+                    {:status status
+                     :url url
+                     :type type})))
+
+          (with-open [in (.body response)
+                      out (io/output-stream dest)]
+            (io/copy in out))))
+      (.deleteOnExit (File. dest))
+      dest)))

@@ -4,14 +4,57 @@
             [connector.http-fetcher :as fetcher]
             [taoensso.timbre :as log]))
 
+(defn configure-s3!
+  [spark {:keys [access-key secret-key region version-id]}]
+
+  (when access-key
+
+    (-> spark
+        (.sparkContext)
+        (.hadoopConfiguration)
+        (.set "fs.s3a.access.key" access-key)))
+
+  (when secret-key
+
+    (-> spark
+        (.sparkContext)
+        (.hadoopConfiguration)
+        (.set "fs.s3a.secret.key" secret-key)))
+
+  (when region
+
+    (-> spark
+        (.sparkContext)
+        (.hadoopConfiguration)
+        (.set "fs.s3a.endpoint"
+              (str "s3." region ".amazonaws.com"))))
+
+  (when version-id
+
+    (-> spark
+        (.sparkContext)
+        (.hadoopConfiguration)
+        (.set "fs.s3a.version.id" version-id)))
+
+  (-> spark
+      (.sparkContext)
+      (.hadoopConfiguration)
+      (.set "fs.s3a.impl"
+            "org.apache.hadoop.fs.s3a.S3AFileSystem")))
+
 (defn resolve-source
   [config]
+
   (let [{:keys [type path cred]} config]
+
     (cond
       (= type :local)
       [path false]
 
-      (contains? #{:gdrive :dropbox :s3 :gcs} type)
+      (= type :s3)
+      [(fetcher/fetch-file! type cred) false]
+
+      (contains? #{:gdrive :dropbox :gcs} type)
       [(fetcher/fetch-file! type cred) true]
 
       :else
@@ -20,9 +63,14 @@
               {:type type})))))
 
 (defn read-dataset
-  [spark {:keys [options] :as config}]
+  [spark {:keys [options cred] :as config}]
+
+  (when (= :s3 (:type config))
+
+    (configure-s3! spark cred))
 
   (let [[path temp?]
+
         (resolve-source config)]
 
     (log/info
@@ -30,6 +78,7 @@
       :metric {:type (:type config)
                :path path
                :temp? temp?}})
+
     (fsql/read-csv
      spark
      path

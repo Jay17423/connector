@@ -13,6 +13,9 @@
              "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
              "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED"]
 
+  :uberjar-merge-with
+  {#"META-INF/services/.*" [slurp str spit]}
+
   :dependencies [[org.clojure/clojure "1.12.0"]
                  [mount "0.1.23"]
                  [com.grammarly/omniconf "0.5.2"]
@@ -23,12 +26,14 @@
                  [com.taoensso/timbre "6.8.0"]
                  [yieldbot/serializable-fn "0.1.3"]
                  [yieldbot/flambo "0.9.0-SNAPSHOT"]
-                 ;; CSV parsing for single-pass clean
                  [org.clojure/data.csv "1.1.0"]
                  [com.fasterxml.jackson.core/jackson-core "2.15.2"]
                  [com.fasterxml.jackson.core/jackson-databind "2.15.2"]
                  [com.fasterxml.jackson.core/jackson-annotations "2.15.2"]
-                 [com.fasterxml.jackson.module/jackson-module-scala_2.12 "2.15.2"]]
+                 [com.fasterxml.jackson.module/jackson-module-scala_2.12 "2.15.2"]
+                 ;; aws s3 deps
+                 [org.apache.hadoop/hadoop-aws "3.3.4"]
+                 [com.amazonaws/aws-java-sdk-bundle "1.12.262"]]
 
   :plugins [[lein-ring "0.12.5"]
             [lein-cljfmt "0.9.2"]

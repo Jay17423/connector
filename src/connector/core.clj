@@ -19,15 +19,25 @@
 
 (defn normalize-body
   "Normalizes POST body and prepares credentials for all cloud source types."
-  [body] 
+  [body]
   (let [body-with-defaults (merge {:link-type "public"} body)
         normalized (-> body-with-defaults
                        (update :type keyword)
                        (update :link-type keyword))]
-    (if (contains? #{:gdrive :dropbox :s3 :gcs} (:type normalized))
+    (cond
+      (contains? #{:gdrive :dropbox :gcs} (:type normalized))
       (assoc normalized :cred {:link (:link normalized)
                                :token (:token normalized)
                                :revision-id (:revision-id normalized)})
+
+      (= :s3 (:type normalized))
+      (assoc normalized :cred {:bucket (:bucket normalized)
+                               :key (:key normalized)
+                               :region (:region normalized)
+                               :access-key (:access-key normalized)
+                               :secret-key (:secret-key normalized)
+                               :version-id (:version-id normalized)})
+      :else
       normalized)))
 
 (defn load-data 
@@ -40,8 +50,8 @@
 
       (let [config (normalize-body body) 
             df (ds/read-dataset session config)
-            preview (util/df->json-preview df)
-            duration (- (System/currentTimeMillis) start-time)]
+            duration (- (System/currentTimeMillis) start-time)
+            preview (util/df->json-preview df)]
 
         (log/info {:msg "dataset loaded successfully"
                    :metric {:type (:type body)

@@ -6,31 +6,25 @@
 
 (defn configure-s3!
   [spark {:keys [access-key secret-key region version-id]}]
-
   (when access-key
-
     (-> spark
         (.sparkContext)
         (.hadoopConfiguration)
         (.set "fs.s3a.access.key" access-key)))
-
+  
   (when secret-key
-
     (-> spark
         (.sparkContext)
         (.hadoopConfiguration)
         (.set "fs.s3a.secret.key" secret-key)))
 
   (when region
-
     (-> spark
         (.sparkContext)
         (.hadoopConfiguration)
-        (.set "fs.s3a.endpoint"
-              (str "s3." region ".amazonaws.com"))))
+        (.set "fs.s3a.endpoint" (str "s3." region ".amazonaws.com"))))
 
   (when version-id
-
     (-> spark
         (.sparkContext)
         (.hadoopConfiguration)
@@ -39,12 +33,10 @@
   (-> spark
       (.sparkContext)
       (.hadoopConfiguration)
-      (.set "fs.s3a.impl"
-            "org.apache.hadoop.fs.s3a.S3AFileSystem")))
+      (.set "fs.s3a.impl" "org.apache.hadoop.fs.s3a.S3AFileSystem")))
 
 (defn resolve-source
   [config]
-
   (let [{:keys [type path cred]} config]
 
     (cond

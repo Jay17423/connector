@@ -19,7 +19,7 @@
       (.followRedirects HttpClient$Redirect/NORMAL)
       (.build)))
 
-(defn- extract-gdrive-id
+(defn- gdrive-id
   [url]
   (or (some (fn [pat]
               (when-let [m (re-find pat url)]
@@ -29,7 +29,7 @@
              #"/open\\?id=([a-zA-Z0-9_-]+)"])
       (throw (ex-info "Cannot extract Drive file ID" {:url url}))))
 
-(defn- force-dropbox-dl
+(defn- dropbox-dl
   [link]
   (cond
     ;; replace preview mode
@@ -43,9 +43,9 @@
     :else
     (str link "?dl=1")))
 
-(defn build-gdrive-request
+(defn gdrive-req
   [link revision-id]
-  (let [id (extract-gdrive-id link)]
+  (let [id (gdrive-id link)]
     {:url (if revision-id
             (str "https://www.googleapis.com/drive/v3/files/"
                  id
@@ -59,7 +59,7 @@
      :method :get
      :headers {}}))
 
-(defn build-dropbox-request
+(defn dropbox-req
   [link token revision-id]
   (cond
     ;; revision download
@@ -78,7 +78,7 @@
 
     ;; public share link
     :else
-    {:url (force-dropbox-dl link)
+    {:url (dropbox-dl link)
      :method :get
      :headers {}}))
 
@@ -87,12 +87,12 @@
   [type {:keys [link token revision-id] :as cred}]
 
   (if (= type :s3)
-    ((str "s3a://" (:bucket cred) "/" (:key cred)))
+    (str "s3a://" (:bucket cred) "/" (:key cred))
     (let [{:keys [url method headers]}
           (case type
-            :gdrive (build-gdrive-request link revision-id)
+            :gdrive (gdrive-req link revision-id)
 
-            :dropbox (build-dropbox-request link token revision-id)
+            :dropbox (dropbox-req link token revision-id)
 
             {:url link
              :method :get

@@ -1,6 +1,6 @@
 (ns connector.config
   "Handles loading and accessing application configuration."
-  (:require
+  (:require 
    [omniconf.core :as cfg]))
 
 (defn load-config!

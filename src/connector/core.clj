@@ -20,8 +20,8 @@
 (defn normalize-body
   "Normalizes POST body and prepares credentials for all cloud source types."
   [body]
-  (let [body-with-defaults (merge {:link-type "public"} body)
-        normalized (-> body-with-defaults
+  (let [body (merge {:link-type "public"} body)
+        normalized (-> body
                        (update :type keyword)
                        (update :link-type keyword))]
     (cond
@@ -55,23 +55,23 @@
 
         (log/info {:msg "dataset loaded successfully"
                    :metric {:type (:type body)
-                            :duration_ms duration}})
+                            :duration duration}})
 
         (-> (response {:status "success"
                        :source (:type config)
-                       :duration_ms duration
-                       :count (fsql/count df)
+                       :duration duration 
+                     ;;  :count (fsql/count df)
                        :rows preview})
             (status 200)))
       
-      (catch Exception e
+      (catch Exception err
         (let [duration (- (System/currentTimeMillis) start-time)]
-          (log/error e {:msg "dataset load failed"
-                        :metric {:duration_ms duration}})
+          (log/error err {:msg "dataset load failed"
+                        :metric {:duration duration}})
 
           (-> (response {:status "error"
-                         :error (.getMessage e)
-                         :duration_ms duration})
+                         :error (.getMessage err)
+                         :duration duration})
               (status 500)))))))
 
 (defroutes app-routes

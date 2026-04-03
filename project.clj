@@ -33,7 +33,8 @@
                  [com.fasterxml.jackson.module/jackson-module-scala_2.12 "2.15.2"]
                  ;; aws s3 deps
                  [org.apache.hadoop/hadoop-aws "3.3.4"]
-                 [com.amazonaws/aws-java-sdk-bundle "1.12.262"]]
+                 [com.amazonaws/aws-java-sdk-bundle "1.12.262"]
+                 [com.google.cloud.bigdataoss/gcs-connector "hadoop3-2.2.11"]]
 
   :plugins [[lein-ring "0.12.5"]
             [lein-cljfmt "0.9.2"]

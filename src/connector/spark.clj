@@ -22,20 +22,29 @@
 
         aws-sdk-jar
         (str home
-             "/.m2/repository/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar")]
+             "/.m2/repository/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar")
+
+        gcs-jar
+        (str home
+             "/.m2/repository/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.11/gcs-connector-hadoop3-2.2.11.jar")]
 
     (-> (fs/session-builder)
+
         (fs/master (cfg/get :spark :app :master-url))
+
         (fs/app-name (cfg/get :spark :app :name))
-        ;; send jars to executors
+
         (fs/config
          "spark.jars"
+
          (str
           (System/getProperty "user.dir")
           "/target/connector-0.1.0-SNAPSHOT-standalone.jar,"
           hadoop-aws-jar ","
-          aws-sdk-jar))
-        ;; required s3 configs
+          aws-sdk-jar ","
+          gcs-jar))
+
+        ;; s3 config
         (fs/config
          "spark.hadoop.fs.s3a.impl"
          "org.apache.hadoop.fs.s3a.S3AFileSystem")

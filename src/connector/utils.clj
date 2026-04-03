@@ -1,6 +1,6 @@
 (ns connector.utils)
 
-(defn df->json-preview
+(defn df->json
   "Converts Spark DataFrame into JSON preview (first 5 rows)."
   [df]
   {:pre [(some? df)]}

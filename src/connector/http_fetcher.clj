@@ -44,20 +44,31 @@
     (str link "?dl=1")))
 
 (defn gdrive-req
-  [link revision-id]
+  [link token revision-id]
   (let [id (gdrive-id link)]
-    {:url (if revision-id
-            (str "https://www.googleapis.com/drive/v3/files/"
-                 id
-                 "/revisions/"
-                 revision-id
-                 "?alt=media")
+    (cond
+      (and revision-id (str/blank? token))
+      (throw (ex-info "GDrive revision download requires token"
+                      {:url link :revision-id revision-id}))
 
-            (str "https://www.googleapis.com/drive/v3/files/"
-                 id
-                 "?alt=media"))
-     :method :get
-     :headers {}}))
+      (not (str/blank? token))
+      {:url (if revision-id
+              (str "https://www.googleapis.com/drive/v3/files/"
+                   id
+                   "/revisions/"
+                   revision-id
+                   "?alt=media")
+
+              (str "https://www.googleapis.com/drive/v3/files/"
+                   id
+                   "?alt=media"))
+       :method :get
+       :headers {}}
+
+      :else
+      {:url (str "https://drive.google.com/uc?export=download&id=" id)
+       :method :get
+       :headers {}})))
 
 (defn dropbox-req
   [link token revision-id]
@@ -90,7 +101,7 @@
     (str "s3a://" (:bucket cred) "/" (:key cred))
     (let [{:keys [url method headers]}
           (case type
-            :gdrive (gdrive-req link revision-id)
+            :gdrive (gdrive-req link token revision-id)
 
             :dropbox (dropbox-req link token revision-id)
 

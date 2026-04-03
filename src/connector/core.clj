@@ -23,14 +23,14 @@
   (let [source (or (:source body) {})
         auth (or (:auth body) {})
         options (or (:options body) {})
-        link-type (keyword (or (:link_type body) (:link-type body) "public"))
+        link-type (keyword (or (:link-type body) "public"))
         type-kw (keyword (:type body))
 
         src-url (or (:url source) (:link source) (:link body))
         src-path (or (:path source) (:path body))
 
-        revision-id (or (:revision_id source) (:revision-id source) (:revision-id body))
-        version-id (or (:version_id source) (:version-id source) (:version-id body))
+        revision-id (or (:revision-id source) (:revision-id body))
+        version-id (or (:version-id source) (:version-id body))
         generation (or (:generation source) (:generation body))
 
         bucket (or (:bucket source) (:bucket body))
@@ -38,11 +38,11 @@
         region (or (:region source) (:region body))
 
         token (or (:token auth) (:token body))
-        access-key (or (:access_key auth) (:access-key auth) (:access-key body))
-        secret-key (or (:secret_key auth) (:secret-key auth) (:secret-key body))
-        project-id (or (:project_id auth) (:project-id auth) (:project-id body))
-        client-email (or (:client_email auth) (:client-email auth) (:client-email body))
-        private-key (or (:private_key auth) (:private-key auth) (:private-key body))
+        access-key (or (:access-key auth) (:access-key body))
+        secret-key (or (:secret-key auth) (:secret-key body))
+        project-id (or (:project-id auth) (:project-id body))
+        client-email (or (:client-email auth) (:client-email body))
+        private-key (or (:private-key auth) (:private-key body))
 
         normalized {:type type-kw
                     :format (:format body)
@@ -61,7 +61,7 @@
              :cred {:link src-url
                     :token token
                     :revision-id revision-id})
- 
+
       ;; dropbox uses url for public, path for private
       (= :dropbox type-kw)
       (assoc normalized

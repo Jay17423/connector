@@ -8,23 +8,23 @@
 
 (s/def ::type (s/and string? #(contains? source-types %)))
 (s/def ::format (s/and string? #(contains? formats %)))
-(s/def ::link_type (s/and string? #(contains? link-types %)))
+(s/def ::link-type (s/and string? #(contains? link-types %)))
 
 (s/def ::path (s/and string? #(not (str/blank? %))))
 (s/def ::url (s/and string? #(str/starts-with? % "http")))
 (s/def ::bucket (s/and string? #(not (str/blank? %))))
 (s/def ::key (s/and string? #(not (str/blank? %))))
 (s/def ::region (s/and string? #(not (str/blank? %))))
-(s/def ::revision_id string?)
-(s/def ::version_id string?)
+(s/def ::revision-id string?)
+(s/def ::version-id string?)
 (s/def ::generation string?)
 
 (s/def ::token (s/and string? #(not (str/blank? %))))
-(s/def ::access_key (s/and string? #(not (str/blank? %))))
-(s/def ::secret_key (s/and string? #(not (str/blank? %))))
-(s/def ::project_id (s/and string? #(not (str/blank? %))))
-(s/def ::client_email (s/and string? #(not (str/blank? %))))
-(s/def ::private_key (s/and string? #(not (str/blank? %))))
+(s/def ::access-key (s/and string? #(not (str/blank? %))))
+(s/def ::secret-key (s/and string? #(not (str/blank? %))))
+(s/def ::project-id (s/and string? #(not (str/blank? %))))
+(s/def ::client-email (s/and string? #(not (str/blank? %))))
+(s/def ::private-key (s/and string? #(not (str/blank? %))))
 
 (s/def ::header boolean?)
 (s/def ::delimiter string?)
@@ -35,20 +35,20 @@
 
 (s/def ::source
   (s/keys :opt-un [::path ::url ::bucket ::key ::region
-                   ::revision_id ::version_id ::generation]))
+                   ::revision-id ::version-id ::generation]))
 
 (s/def ::auth
-  (s/keys :opt-un [::token ::access_key ::secret_key
-                   ::project_id ::client_email ::private_key]))
+  (s/keys :opt-un [::token ::access-key ::secret-key
+                   ::project-id ::client-email ::private-key]))
 
 (s/def ::body
   (s/keys
    :req-un [::type ::format ::source ::options]
-   :opt-un [::link_type ::auth]))
+   :opt-un [::link-type ::auth]))
 
 (defn- private-link?
   [body]
-  (= "private" (or (:link_type body) (:link-type body) "public")))
+  (= "private" (or (:link-type body) "public")))
 
 (defn- present?
   [value]
@@ -82,13 +82,13 @@
       "s3"
       (and (require-fields source [:bucket :key])
            (if private?
-             (require-fields auth [:access_key :secret_key])
+             (require-fields auth [:access-key :secret-key])
              true))
 
       "gcs"
       (and (require-fields source [:bucket :key])
            (if private?
-             (require-fields auth [:project_id :client_email :private_key])
+             (require-fields auth [:project-id :client-email :private-key])
              true))
 
       false)))

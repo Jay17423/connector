@@ -14,12 +14,14 @@
            [java.util UUID]))
 
 (def http-client
+  "Reusable HTTP client with timeout and redirect support."
   (-> (HttpClient/newBuilder)
       (.connectTimeout (Duration/ofSeconds 30))
       (.followRedirects HttpClient$Redirect/NORMAL)
       (.build)))
 
 (defn- gdrive-id
+  "Extracts Google Drive file ID from URL."
   [url]
   (or (some (fn [pat]
               (when-let [m (re-find pat url)]
@@ -27,9 +29,10 @@
             [#"/file/d/([a-zA-Z0-9_-]+)"
              #"[?&]id=([a-zA-Z0-9_-]+)"
              #"/open\\?id=([a-zA-Z0-9_-]+)"])
-      (throw (ex-info "Cannot extract Drive file ID" {:url url}))))
+      (throw (ex-info "Unable to extract Google Drive file ID" {:url url}))))
 
 (defn- dropbox-dl
+  "Converts Dropbox share link to direct download URL."
   [link]
   (cond
     ;; replace preview mode
@@ -44,6 +47,7 @@
     (str link "?dl=1")))
 
 (defn gdrive-req
+  "Builds Google Drive download request configuration."
   [link token revision-id]
   (let [id (gdrive-id link)]
     (cond
@@ -71,6 +75,7 @@
        :headers {}})))
 
 (defn dropbox-req
+  "Builds Dropbox download request configuration."
   [link token revision-id]
   (cond
     ;; revision download
@@ -95,6 +100,7 @@
 
 ;; main downloader
 (defn fetch-file!
+  "Downloads file from cloud source to temporary local path."
   [type {:keys [link token revision-id] :as cred}]
 
   (if (= type :s3)

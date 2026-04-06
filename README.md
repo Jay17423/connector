@@ -43,10 +43,7 @@ To start a web server for the application, run:
     },
     "options": {
         "header": true,
-        "delimiter": ",",
-        "inferSchema": true,
-        "multiLine": false,
-        "encoding": "UTF-8"
+        "delimiter": ","
     }
 }
 ```

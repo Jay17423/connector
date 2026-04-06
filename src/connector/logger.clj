@@ -1,28 +1,14 @@
 (ns connector.logger
-  "Configures Timbre logging with daily rotating log files stored in the logs
-   directory."
+  "Configures Timbre with rolling log files."
   (:require
    [taoensso.timbre :as log]
-   [taoensso.timbre.appenders.core :as appenders]
-   [clj-time.core :as time]
-   [clj-time.format :as format]))
+   [taoensso.timbre.appenders.community.rolling :as rolling]))
 
-(def date-formatter
-  (format/formatter "yyyy-MM-dd"))
-
-(defn today-log-file
-  "Returns log file path using current date (yyyy-MM-dd) inside logs folder."
-  []
-  (str "logs/app-"
-       (format/unparse
-        date-formatter
-        (time/now))
-       ".log"))
+(.mkdirs (java.io.File. "logs"))
 
 (log/merge-config!
  {:level :info
   :appenders
-  {:spit
-   (appenders/spit-appender
-    {:fname (today-log-file)
-     :append? true})}})
+  {:rolling (rolling/rolling-appender
+             {:path    (str "logs" "/app.log")
+              :pattern :daily})}})

@@ -1,20 +1,20 @@
 {:server
  {:port {:description "HTTP server port"
-         :type        :long
-         :default     3000}}
+         :type :long 
+         :default 3000}}
 
  :spark
  {:app
   {:name {:description "Spark application name"
-          :type        :string
-          :required    true}
+          :type :string
+          :required true}
 
    :master-url {:description "Spark master URL"
-                :type        :string
-                :required    true}}
+                :type :string
+                :required true}}
 
   :sql
   {:shuffle-partitions
    {:description "Number of shuffle partitions"
-    :type        :long
-    :default     4}}}}
+    :type :long
+    :default 4}}}}

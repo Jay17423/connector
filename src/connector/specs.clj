@@ -28,10 +28,9 @@
 
 (s/def ::header boolean?)
 (s/def ::delimiter string?)
-(s/def ::inferSchema boolean?)
-(s/def ::multiLine boolean?)
-(s/def ::encoding string?)
-(s/def ::options (s/keys :opt-un [::header ::delimiter ::inferSchema ::multiLine ::encoding]))
+(s/def ::options (s/keys
+                  :opt-un
+                  [::header ::delimiter]))
 
 (s/def ::source
   (s/keys :opt-un [::path ::url ::bucket ::key ::region
@@ -90,7 +89,6 @@
            (if private?
              (require-fields auth [:project-id :client-email :private-key])
              true))
-
       false)))
 
 (s/def ::valid-body

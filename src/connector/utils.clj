@@ -1,6 +1,6 @@
 (ns connector.utils)
 
-(defn df->json
+(comment (defn df->json
   "Converts Spark DataFrame into JSON preview (first 5 rows)."
   [df]
   {:pre [(some? df)]}
@@ -14,4 +14,4 @@
                                (fn [idx col]
                                  [(keyword col) (.get row idx)])
                                cols))]
-          (recur (conj rows parsed) (inc cnt)))))))
+          (recur (conj rows parsed) (inc cnt))))))))

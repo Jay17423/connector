@@ -14,7 +14,8 @@
             [connector.dataset :as ds]
             [connector.specs :as spec]
             [omniconf.core :as cfg]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [connector.utils :as util]))
 
 (defn normalize-body [body]
   (let [{:keys [source auth options type format link-type]
@@ -76,7 +77,8 @@
 
       (let [config (normalize-body body)
             dataset (ds/read-dataset session config)
-            duration (- (System/currentTimeMillis) start-time)]
+            duration (- (System/currentTimeMillis) start-time)
+            preview (util/dataset->preview dataset)]
 
         (log/info {:msg "dataset loaded successfully"
                    :metric {:type (:type body)
@@ -85,6 +87,7 @@
         (-> (response {:status "success"
                        :source (:type body)
                        :duration-ms duration
+                       :data preview
                        ;; :count (fsql/count df)
                        })
             (status 200)))
@@ -111,7 +114,6 @@
 
 (defroutes app-routes
   "Defines API routes."
-  (GET "/health" [] (response {:status "ok"}))
   (POST "/data-load" [] load-data)
   (route/not-found (-> (response {:error "NOT_FOUND"}) (status 404))))
 

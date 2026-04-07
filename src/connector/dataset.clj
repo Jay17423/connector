@@ -109,14 +109,12 @@
                :path path
                :temp? temp?}})
 
-    (fsql/read-csv
-     spark
-     path
-     :header (:header opts)
-     :delimiter (:delimiter opts)
-     :mode "PERMISSIVE"
-     :nullValue ""
-     :ignoreLeadingWhiteSpace true
-     :ignoreTrailingWhiteSpace true
-     :columnNameOfCorruptRecord "_corrupt_record"
-     :maxColumns 20480)))
+    (fsql/read-csv spark path 
+                   :header (:header opts)
+                   :delimiter (:delimiter opts)
+                   :mode "PERMISSIVE"
+                   :nullValue ""
+                   :ignoreLeadingWhiteSpace true
+                   :ignoreTrailingWhiteSpace true
+                   :columnNameOfCorruptRecord "_corrupt_record"
+                   :maxColumns 20480)))

@@ -35,11 +35,9 @@
   "Converts Dropbox share link to direct download URL."
   [link]
   (cond
-    ;; replace preview mode
     (str/includes? link "dl=")
     (str/replace link #"dl=0" "dl=1")
 
-    ;; append param
     (str/includes? link "?")
     (str link "&dl=1")
 
@@ -58,14 +56,9 @@
       (not (str/blank? token))
       {:url (if revision-id
               (str "https://www.googleapis.com/drive/v3/files/"
-                   id
-                   "/revisions/"
-                   revision-id
-                   "?alt=media")
-
+                   id "/revisions/" revision-id "?alt=media")
               (str "https://www.googleapis.com/drive/v3/files/"
-                   id
-                   "?alt=media"))
+                   id "?alt=media"))
        :method :get
        :headers {}}
 
@@ -78,27 +71,23 @@
   "Builds Dropbox download request configuration."
   [link token revision-id]
   (cond
-    ;; revision download
     revision-id
     {:url "https://content.dropboxapi.com/2/files/download"
      :method :post
      :headers {"Dropbox-API-Arg"
                (str "{\"path\":\"rev:" revision-id "\"}")}}
 
-    ;; private file latest version
     (not (str/blank? token))
     {:url "https://content.dropboxapi.com/2/files/download"
      :method :post
      :headers {"Dropbox-API-Arg"
                (str "{\"path\":\"" link "\"}")}}
 
-    ;; public share link
     :else
     {:url (dropbox-dl link)
      :method :get
      :headers {}}))
 
-;; main downloader
 (defn fetch-file!
   "Downloads file from cloud source to temporary local path."
   [type {:keys [link token revision-id] :as cred}]
@@ -107,57 +96,55 @@
     (str "s3a://" (:bucket cred) "/" (:key cred))
     (let [{:keys [url method headers]}
           (case type
-            :gdrive (gdrive-req link token revision-id)
-
+            :gdrive  (gdrive-req link token revision-id)
             :dropbox (dropbox-req link token revision-id)
-
-            {:url link
-             :method :get
-             :headers {}})
+            {:url link :method :get :headers {}})
 
           dest (str (System/getProperty "java.io.tmpdir")
                     File/separator
                     "cloud-raw-"
                     (UUID/randomUUID)
                     ".csv")]
-      (log/info
-       {:msg "starting cloud download"
-        :metric {:type type :url url :dest dest}})
 
-      (let [req-builder (HttpRequest/newBuilder)]
+      (log/info {:msg "starting cloud download"
+                 :metric {:type type :url url :dest dest}})
+
+      (let [download-start (System/currentTimeMillis)
+            req-builder    (HttpRequest/newBuilder)]
+
         (.uri req-builder (URI/create url))
-        (.timeout req-builder
-                  (Duration/ofSeconds 120))
+        (.timeout req-builder (Duration/ofSeconds 120))
+
         (when (not (str/blank? token))
-          (.header req-builder
-                   "Authorization"
-                   (str "Bearer " token)))
+          (.header req-builder "Authorization" (str "Bearer " token)))
+
         (doseq [[k v] headers]
           (.header req-builder k v))
-        (let [request (if (= method :post)
-                        (.build
-                         (.POST
-                          req-builder
-                          (java.net.http.HttpRequest$BodyPublishers/noBody)))
-                        (.build
-                         (.GET req-builder)))
 
-              response (.send
-                        http-client
-                        request
-                        (HttpResponse$BodyHandlers/ofInputStream))
+        (let [request  (if (= method :post)
+                         (.build
+                          (.POST
+                           req-builder
+                           (java.net.http.HttpRequest$BodyPublishers/noBody)))
+                         (.build (.GET req-builder)))
 
-              status (.statusCode response)]
+              response (.send http-client request
+                              (HttpResponse$BodyHandlers/ofInputStream))
+              status   (.statusCode response)]
 
           (when (or (< status 200) (>= status 300))
-            (throw (ex-info
-                    "Cloud download failed"
-                    {:status status
-                     :url url
-                     :type type})))
+            (throw (ex-info "Cloud download failed"
+                            {:status status :url url :type type})))
 
-          (with-open [in (.body response)
+          (with-open [in  (.body response)
                       out (io/output-stream dest)]
-            (io/copy in out))))
+            (io/copy in out))
+
+          (log/info {:msg "download complete"
+                     :metric {:type        type
+                              :bytes       (.length (File. dest))
+                              :duration-ms (- (System/currentTimeMillis)
+                                              download-start)}})))
+
       (.deleteOnExit (File. dest))
       dest)))

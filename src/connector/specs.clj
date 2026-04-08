@@ -69,25 +69,19 @@
 (defn- valid-source?
   "Validates source configuration and required credentials based on type."
   [body]
-  (let [source   (:source body)
-        auth     (:auth body)
+  (let [source (:source body)
+        auth (:auth body)
         private? (private-link? body)]
-
     (case (:type body)
 
       "local"
       (require-fields source [:path])
 
       "gdrive"
-      (and
-       (require-fields source [:url])
-
-       (if private?
-         (require-fields auth
-                         [:refresh-token
-                          :client-id
-                          :client-secret])
-         true))
+      (and (require-fields source [:url])
+           (if private?
+             (require-fields auth [:refresh-token :client-id :client-secret])
+             true))
 
       "dropbox"
       (if private?
@@ -105,7 +99,7 @@
            (if private?
              (require-fields auth [:project-id :client-email :private-key])
              true))
-      
+
       false)))
 
 (s/def ::valid-body
@@ -114,7 +108,8 @@
    valid-source?))
 
 (defn validate-body!
-  "Validates request body against spec and throws error if invalid."
+  "Validates request body against spec and throws AssertionError."
   [body]
-  {:pre [(s/valid? ::valid-body body)]}
+  (when-not (s/valid? ::valid-body body)
+    (throw (AssertionError. (s/explain-str ::valid-body body))))
   body)

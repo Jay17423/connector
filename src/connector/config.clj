@@ -4,8 +4,7 @@
    [omniconf.core :as cfg]))
 
 (defn load-config!
-  "Load and verify application configuration"
+  "Loads and verifies application configuration from the given path."
   [path]
-  (try (cfg/populate-from-file path)
-       (cfg/verify)
-       (catch Exception err (throw err))))
+  (cfg/populate-from-file path)
+  (cfg/verify))

@@ -18,15 +18,15 @@
             [connector.utils :as util]))
 
 (defn normalize-body
-  "Creates the config form the body"
+  "Creates the config from the body. "
   [body]
   (let [{:keys [source auth options type format link-type]
          :or {link-type "public"}} body
-        type-kw (keyword type)
-        normalized {:type     type-kw
-                    :format   format
+        type-kw    (keyword type)
+        normalized {:type type-kw
+                    :format format
                     :link-type (keyword link-type)
-                    :options  options}]
+                    :options options}]
 
     (case type-kw
       :local
@@ -43,7 +43,7 @@
 
       :dropbox
       (assoc normalized
-             :cred {:link (if (= :private (:link-type normalized))
+             :cred {:link (if (= :private (keyword link-type))
                             (:path source)
                             (:url source))
                     :token (:token auth)
@@ -67,7 +67,8 @@
                     :client-email (:client-email auth)
                     :private-key (some-> (:private-key auth)
                                          (str/replace "\\n" "\n"))})
-      normalized)))
+      (throw (ex-info "Unsupported source type"
+                      {:type type-kw})))))
 
 (defn load-data
   "Handles dataset load request."
@@ -83,11 +84,12 @@
             dataset (ds/read-dataset session config)
             duration (- (System/currentTimeMillis) start-time)
             preview (util/dataset->preview dataset)]
+
         (log/info {:msg "Dataset loaded successfully"
                    :metric {:type (:type body)
                             :duration-ms duration}})
 
-        (-> (response {:status "Success"
+        (-> (response {:status "success"
                        :source (:type body)
                        :duration-ms duration
                        :data preview})
@@ -95,22 +97,23 @@
 
       (catch AssertionError err
         (let [duration (- (System/currentTimeMillis) start-time)]
-          (log/error  {:msg "Invalid request body"
-                       :error (.getMessage err)
-                       :metric {:duration-ms duration}})
-
-          (-> (response {:status "Error"
-                         :msg "Invalid request body" 
+          (log/warn {:msg "Invalid request body"
+                     :error (.getMessage err)
+                     :metric {:duration-ms duration}})
+          (-> (response {:status "error"
+                         :msg "Invalid request body"
+                         :error (.getMessage err)
                          :duration-ms duration})
               (status 400))))
-
+      
       (catch Exception err
         (let [duration (- (System/currentTimeMillis) start-time)]
-          (log/error  {:msg "Dataset load failed"
-                       :error (.getMessage err)
-                       :metric {:duration-ms duration}})
-          (-> (response {:status "Error"
-                         :msg "Internal server error!" 
+          (log/error {:msg "Dataset load failed"
+                      :error (.getMessage err)
+                      :type (-> err .getClass .getName)
+                      :metric {:duration-ms duration}}) 
+          (-> (response {:status "error"
+                         :msg "Internal server error"
                          :duration-ms duration})
               (status 500)))))))
 

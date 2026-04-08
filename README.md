@@ -1,23 +1,86 @@
-# connector
+# Connector
 
-FIXME
+Connector is a Clojure service that loads CSV data from multiple sources and
+returns a preview response.
+
+Supported source types:
+- local filesystem
+- Google Drive
+- Dropbox
+- Amazon S3
+- Google Cloud Storage
 
 ## Prerequisites
 
-You will need [Leiningen][] 2.0.0 or above installed.
+- JDK 17
+- Leiningen 2.0.0+
 
-[leiningen]: https://github.com/technomancy/leiningen
+Verify Java version:
 
-## Running
+```bash
+java -version
+```
 
-To start a web server for the application, run:
+Expected major version is 17.
 
-    lein uberjar
-    lein run
+Install Leiningen:
+- https://github.com/technomancy/leiningen
 
-## API request body
+## Configuration
 
-### Common request body
+Application config is loaded from `config/config.edn`.
+
+Default values:
+- HTTP port: `3000`
+- Spark app name: `connector-app`
+- Spark master: `spark://fc-bergin:7077`
+
+If needed, edit `config/config.edn` before starting the service.
+
+## Build And Run
+
+From project root:
+
+```bash
+lein uberjar
+lein run
+```
+
+When startup is complete, the API is available at:
+
+```text
+http://localhost:3000
+```
+
+## API Overview
+
+- Method: `POST`
+- Endpoint: `/data-load`
+- Content-Type: `application/json`
+- Response: JSON
+
+Example curl call:
+
+```bash
+curl -X POST http://localhost:3000/data-load \
+    -H "Content-Type: application/json" \
+    -d '{
+        "type": "local",
+        "format": "csv",
+        "link-type": "public",
+        "source": {
+            "path": "/data/input.csv"
+        },
+        "options": {
+            "header": true,
+            "delimiter": ","
+        }
+    }'
+```
+
+## Request Body
+
+### Common structure
 
 ```json
 {
@@ -35,6 +98,7 @@ To start a web server for the application, run:
         "generation": ""
     },
     "auth": {
+        "token": "",
         "access-key": "",
         "secret-key": "",
         "project-id": "",
@@ -43,7 +107,7 @@ To start a web server for the application, run:
         "client-id": "",
         "client-secret": "",
         "refresh-token": ""
-  },    
+    },
     "options": {
         "header": true,
         "delimiter": ","
@@ -51,14 +115,19 @@ To start a web server for the application, run:
 }
 ```
 
-Rules:
-- `format` is always `csv`.
-- `link-type = private` requires `auth`.
-- `link-type = public` does not require `auth`.
-- `revision-id`, `version-id`, `generation` are optional.
-- Dropbox: public uses `source.url`, private uses `source.path`.
+### Rules
 
-### GDrive
+- `format` must be `csv`.
+- For `link-type = public`, `auth` is usually not required.
+- For `link-type = private`, include provider-specific `auth` fields.
+- `revision-id`, `version-id`, and `generation` are optional.
+- Dropbox uses:
+    - `source.url` for public links
+    - `source.path` for private files
+
+## Source-specific Examples
+
+### Google Drive
 
 Public:
 
@@ -89,10 +158,10 @@ Private (optional `revision-id`):
         "revision-id": "REV-ID"
     },
     "auth": {
-    "client-id": "xxxx",
-    "client-secret": "xxxx",
-    "refresh-token": "xxxx"
-  },
+        "client-id": "xxxx",
+        "client-secret": "xxxx",
+        "refresh-token": "xxxx"
+    },
     "options": {
         "header": true,
         "delimiter": ","
@@ -139,9 +208,9 @@ Private:
 }
 ```
 
-### S3
+### Amazon S3
 
-Public (signed or public bucket):
+Public (public bucket/object):
 
 ```json
 {
@@ -184,7 +253,7 @@ Private (optional `version-id`):
 }
 ```
 
-### GCS
+### Google Cloud Storage
 
 Public:
 
@@ -228,7 +297,7 @@ Private (optional `generation`):
 }
 ```
 
-### Local
+### Local Filesystem
 
 ```json
 {
@@ -242,6 +311,45 @@ Private (optional `generation`):
         "header": true,
         "delimiter": ","
     }
+}
+```
+
+## Response Format
+
+Success (`200`):
+
+```json
+{
+    "status": "success",
+    "source": "local",
+    "duration-ms": 123,
+    "data": [
+        {
+            "columnA": "value1",
+            "columnB": "value2"
+        }
+    ]
+}
+```
+
+Validation error (`400`):
+
+```json
+{
+    "status": "error",
+    "msg": "Invalid request body",
+    "error": "...details...",
+    "duration-ms": 15
+}
+```
+
+Internal error (`500`):
+
+```json
+{
+    "status": "error",
+    "msg": "Internal server error",
+    "duration-ms": 20
 }
 ```
 

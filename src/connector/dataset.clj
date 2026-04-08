@@ -36,6 +36,7 @@
   (let [hconf (-> spark
                   .sparkContext
                   .hadoopConfiguration)]
+    
     (when project-id
       (.set hconf "fs.gs.project.id" project-id))
 
@@ -59,29 +60,27 @@
               (.getAbsolutePath tmp-file))))))
 
 (defn resolve-source
-  "Resolves dataset source path and determines if temporary file is required."
+  "Resolves dataset source path. Returns just the path string."
   [config]
   (let [{:keys [type path cred]} config]
     (cond
       (= type :local)
-      [path false]
+      path
 
       (= type :s3)
-      [(str "s3a://" (:bucket cred) "/" (:key cred)) false]
+      (str "s3a://" (:bucket cred) "/" (:key cred))
 
       (= type :gcs)
-      [(str "gs://"
-            (:bucket cred)
-            "/"
-            (:key cred)
-            (when-let [g (:generation cred)]
-              (str "#" g))) false]
+      (str "gs://" (:bucket cred) "/"
+           (:key cred)
+           (when-let [g (:generation cred)]
+             (str "#" g)))
 
       (contains? #{:gdrive :dropbox} type)
-      [(fetcher/fetch-file! type cred) true]
+      (fetcher/fetch-file! type cred)
 
       :else
-      (throw 
+      (throw
        (ex-info "Unsupported dataset source"
                 {:type type})))))
 
@@ -98,19 +97,23 @@
   (let [opts (merge {:header true
                      :delimiter ","}
                     options)
-        [path temp?] (resolve-source config)]
+        path (resolve-source config)]
 
-    (log/info
-     {:msg "reading dataset into spark"
-      :metric {:type (:type config)
-               :path path
-               :temp? temp?}})
-
-    (fsql/read-csv spark path
-                   :header (:header opts)
-                   :delimiter (:delimiter opts)
-                   :mode "PERMISSIVE"
-                   :nullValue ""
-                   :ignoreLeadingWhiteSpace true
-                   :ignoreTrailingWhiteSpace true
-                   :columnNameOfCorruptRecord "_corrupt_record")))
+    (log/info {:msg "Reading dataset into Spark"
+               :metric {:type (:type config)
+                        :path path}})
+    (try
+      (fsql/read-csv spark path
+                     :header (:header opts)
+                     :delimiter (:delimiter opts)
+                     :mode "PERMISSIVE"
+                     :nullValue ""
+                     :ignoreLeadingWhiteSpace true
+                     :ignoreTrailingWhiteSpace true
+                     :columnNameOfCorruptRecord "_corrupt_record")
+      (catch Exception err
+        (throw (ex-info "Failed to read dataset"
+                        {:type  (:type config)
+                         :path  path
+                         :cause (.getMessage err)}
+                        err))))))

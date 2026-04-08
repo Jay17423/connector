@@ -10,5 +10,5 @@
  {:level :info
   :appenders
   {:rolling (rolling/rolling-appender
-             {:path    (str "logs" "/app.log")
+             {:path (str "logs" "/app.log")
               :pattern :daily})}})

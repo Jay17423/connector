@@ -41,22 +41,19 @@
 
     (when (and project-id client-email private-key)
       (let [json-key
-            (str
-             "{"
-             "\"type\":\"service_account\","
-             "\"project_id\":\"" (json-escape project-id) "\","
-             "\"private_key_id\":\"placeholder\","
-             "\"private_key\":\"" (json-escape private-key) "\","
-             "\"client_email\":\"" (json-escape client-email) "\","
-             "\"client_id\":\"placeholder\","
-             "\"auth_uri\":\"https://accounts.google.com/o/oauth2/auth\","
-             "\"token_uri\":\"https://oauth2.googleapis.com/token\""
-             "}")
+            (str "{"
+                 "\"type\":\"service_account\","
+                 "\"project_id\":\"" (json-escape project-id) "\","
+                 "\"private_key_id\":\"placeholder\","
+                 "\"private_key\":\"" (json-escape private-key) "\","
+                 "\"client_email\":\"" (json-escape client-email) "\","
+                 "\"client_id\":\"placeholder\","
+                 "\"auth_uri\":\"https://accounts.google.com/o/oauth2/auth\","
+                 "\"token_uri\":\"https://oauth2.googleapis.com/token\""
+                 "}")
             tmp-file (java.io.File/createTempFile "gcs-key-" ".json")]
-
         (.deleteOnExit tmp-file)
         (spit (.getAbsolutePath tmp-file) json-key)
-
         (.set hconf "fs.gs.auth.type" "SERVICE_ACCOUNT_JSON_KEYFILE")
         (.set hconf "fs.gs.auth.service.account.json.keyfile"
               (.getAbsolutePath tmp-file))))))
@@ -84,7 +81,7 @@
       [(fetcher/fetch-file! type cred) true]
 
       :else
-      (throw
+      (throw 
        (ex-info "Unsupported dataset source"
                 {:type type})))))
 
@@ -109,12 +106,11 @@
                :path path
                :temp? temp?}})
 
-    (fsql/read-csv spark path 
+    (fsql/read-csv spark path
                    :header (:header opts)
                    :delimiter (:delimiter opts)
                    :mode "PERMISSIVE"
                    :nullValue ""
                    :ignoreLeadingWhiteSpace true
                    :ignoreTrailingWhiteSpace true
-                   :columnNameOfCorruptRecord "_corrupt_record"
-                   :maxColumns 20480)))
+                   :columnNameOfCorruptRecord "_corrupt_record")))

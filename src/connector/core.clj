@@ -2,7 +2,7 @@
   "Provides POST API to load dataset dynamically and return preview rows."
   (:gen-class)
   (:require [mount.core :as mount]
-            [compojure.core :refer [defroutes GET POST]]
+            [compojure.core :refer [defroutes POST]]
             [compojure.route :as route]
             [ring.util.response :refer [response status]]
             [ring.adapter.jetty :as jetty]
@@ -17,7 +17,9 @@
             [clojure.string :as str]
             [connector.utils :as util]))
 
-(defn normalize-body [body]
+(defn normalize-body
+  "Creates the config form the body"
+  [body]
   (let [{:keys [source auth options type format link-type]
          :or {link-type "public"}} body
         type-kw (keyword type)
@@ -25,8 +27,8 @@
                     :format   format
                     :link-type (keyword link-type)
                     :options  options}]
-    (case type-kw
 
+    (case type-kw
       :local
       (assoc normalized :path (:path source))
 
@@ -34,6 +36,9 @@
       (assoc normalized
              :cred {:link (:url source)
                     :token (:token auth)
+                    :refresh-token (:refresh-token auth)
+                    :client-id (:client-id auth)
+                    :client-secret (:client-secret auth)
                     :revision-id (:revision-id source)})
 
       :dropbox
@@ -61,7 +66,7 @@
                     :project-id (:project-id auth)
                     :client-email (:client-email auth)
                     :private-key (some-> (:private-key auth)
-                                          (str/replace "\\n" "\n"))})
+                                         (str/replace "\\n" "\n"))})
       normalized)))
 
 (defn load-data
@@ -71,45 +76,42 @@
         body (:body req)]
     (try
       (spec/validate-body! body)
-
-      (log/info {:msg "dataset load request"
+      (log/info {:msg "Dataset load request"
                  :metric {:type (:type body)}})
 
       (let [config (normalize-body body)
             dataset (ds/read-dataset session config)
             duration (- (System/currentTimeMillis) start-time)
             preview (util/dataset->preview dataset)]
-
-        (log/info {:msg "dataset loaded successfully"
+        (log/info {:msg "Dataset loaded successfully"
                    :metric {:type (:type body)
                             :duration-ms duration}})
 
-        (-> (response {:status "success"
+        (-> (response {:status "Success"
                        :source (:type body)
                        :duration-ms duration
-                       :data preview
-                       ;; :count (fsql/count df)
-                       })
+                       :data preview})
             (status 200)))
 
       (catch AssertionError err
         (let [duration (- (System/currentTimeMillis) start-time)]
-          (log/error err {:msg "invalid request body"
-                          :metric {:duration duration}})
+          (log/error  {:msg "Invalid request body"
+                       :error (.getMessage err)
+                       :metric {:duration-ms duration}})
 
-          (-> (response {:status "error"
-                         :error "invalid request body"
-                         :duration duration})
+          (-> (response {:status "Error"
+                         :msg "Invalid request body" 
+                         :duration-ms duration})
               (status 400))))
 
       (catch Exception err
         (let [duration (- (System/currentTimeMillis) start-time)]
-          (log/error err {:msg "dataset load failed"
-                          :metric {:duration duration}})
-
-          (-> (response {:status "error"
-                         :error (.getMessage err)
-                         :duration duration})
+          (log/error  {:msg "Dataset load failed"
+                       :error (.getMessage err)
+                       :metric {:duration-ms duration}})
+          (-> (response {:status "Error"
+                         :msg "Internal server error!" 
+                         :duration-ms duration})
               (status 500)))))))
 
 (defroutes app-routes
@@ -125,14 +127,15 @@
 
 (defn -main
   "Starts application and HTTP server."
-  [] 
+  []
   (try
-    (log/info {:msg "starting connector service"})
+    (log/info {:msg "Starting connector service"})
     (app-config/load-config! "config/config.edn")
     (mount/start)
-    (log/info {:msg "starting http server"
+    (log/info {:msg "Starting http server"
                :metric {:port (cfg/get :server :port)}})
     (jetty/run-jetty app {:port (cfg/get :server :port)})
     (catch Exception err
-      (log/error err "startup failed")
+      (log/error {:msg "Startup failed"
+                  :error (.getMessage err)})
       (System/exit 1))))

@@ -1,27 +1,26 @@
 (ns connector.http-fetcher
-  "Downloader for cloud sources (no manual CSV cleaning)."
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]
-            [taoensso.timbre :as log])
-  (:import [java.io File]
-           [java.net URI]
-           [java.net.http
-            HttpClient
-            HttpClient$Redirect
-            HttpRequest
-            HttpResponse$BodyHandlers]
-           [java.time Duration]
-           [java.util UUID]))
+  "Provides HTTP file download utilities for GDrive, Dropbox, and public URLs."
+  (:require
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [taoensso.timbre :as log])
+  (:import
+   [java.io File]
+   [java.net URI]
+   [java.net.http
+    HttpClient HttpClient$Redirect HttpRequest HttpResponse$BodyHandlers]
+   [java.time Duration]
+   [java.util UUID]))
 
 (def http-client
-  "Reusable HTTP client with timeout and redirect support."
+  "Reusable HTTP client configured with timeout and redirect handling."
   (-> (HttpClient/newBuilder)
       (.connectTimeout (Duration/ofSeconds 30))
       (.followRedirects HttpClient$Redirect/NORMAL)
       (.build)))
 
 (defn- gdrive-id
-  "Extracts Google Drive file ID from URL."
+  "Extracts Google Drive file ID from supported URL patterns."
   [url]
   (or (some (fn [pat]
               (when-let [m (re-find pat url)]
@@ -29,122 +28,162 @@
             [#"/file/d/([a-zA-Z0-9_-]+)"
              #"[?&]id=([a-zA-Z0-9_-]+)"
              #"/open\\?id=([a-zA-Z0-9_-]+)"])
-      (throw (ex-info "Unable to extract Google Drive file ID" {:url url}))))
+      (throw
+       (ex-info "Unable to extract Google Drive file ID" {:url url}))))
 
-(defn- dropbox-dl
-  "Converts Dropbox share link to direct download URL."
-  [link]
-  (cond
-    (str/includes? link "dl=")
-    (str/replace link #"dl=0" "dl=1")
-
-    (str/includes? link "?")
-    (str link "&dl=1")
-
-    :else
-    (str link "?dl=1")))
+(defn- refresh-access-token
+  "Fetches new Google OAuth access token using refresh credentials."
+  [refresh-token client-id client-secret]
+  (let [body (str "client_id=" client-id
+                  "&client_secret=" client-secret
+                  "&refresh_token=" refresh-token
+                  "&grant_type=refresh_token")
+        req (-> (HttpRequest/newBuilder)
+                (.uri (URI/create "https://oauth2.googleapis.com/token"))
+                (.timeout (Duration/ofSeconds 30))
+                (.header "Content-Type"
+                         "application/x-www-form-urlencoded")
+                (.POST
+                 (java.net.http.HttpRequest$BodyPublishers/ofString
+                  body))
+                (.build))
+        res (.send http-client req
+                   (HttpResponse$BodyHandlers/ofString))]
+    (if (= 200 (.statusCode res))
+      (second (re-find
+               #"\"access_token\"\s*:\s*\"([^\"]+)\""
+               (.body res)))
+      (throw (ex-info "Unable to refresh access token"
+                      {:status (.statusCode res)})))))
 
 (defn gdrive-req
-  "Builds Google Drive download request configuration."
-  [link token revision-id]
-  (let [id (gdrive-id link)]
+  "Builds Google Drive request supporting public, private, and revision
+   download."
+  [link refresh-token client-id client-secret revision-id]
+  (let [id (gdrive-id link)
+        token (refresh-access-token refresh-token client-id client-secret)]
     (cond
-      (and revision-id (str/blank? token))
-      (throw (ex-info "GDrive revision download requires token"
-                      {:url link :revision-id revision-id}))
-
-      (not (str/blank? token))
-      {:url (if revision-id
-              (str "https://www.googleapis.com/drive/v3/files/"
-                   id "/revisions/" revision-id "?alt=media")
-              (str "https://www.googleapis.com/drive/v3/files/"
-                   id "?alt=media"))
+      ;; revision requires auth
+      revision-id
+      {:url
+       (str "https://www.googleapis.com/drive/v3/files/" id "/revisions/"
+            revision-id
+            "?alt=media")
        :method :get
-       :headers {}}
+       :headers {"Authorization" (str "Bearer " token)}}
 
+      ;; private file
+      token
+      {:url (str "https://www.googleapis.com/drive/v3/files/" id
+                 "?alt=media")
+       :method :get
+       :headers {"Authorization" (str "Bearer " token)}}
+
+      ;; public file
       :else
       {:url (str "https://drive.google.com/uc?export=download&id=" id)
        :method :get
        :headers {}})))
 
 (defn dropbox-req
-  "Builds Dropbox download request configuration."
+  "Builds Dropbox request supporting public link, private token, and revision
+   download."
   [link token revision-id]
   (cond
+    ;; revision download
     revision-id
     {:url "https://content.dropboxapi.com/2/files/download"
      :method :post
-     :headers {"Dropbox-API-Arg"
-               (str "{\"path\":\"rev:" revision-id "\"}")}}
+     :headers {"Authorization" (str "Bearer " token) "Dropbox-API-Arg"
+               (str "{\"path\": \"rev:" revision-id "\"}")}}
 
-    (not (str/blank? token))
+    ;; private file
+    token
     {:url "https://content.dropboxapi.com/2/files/download"
      :method :post
-     :headers {"Dropbox-API-Arg"
-               (str "{\"path\":\"" link "\"}")}}
+     :headers {"Authorization" (str "Bearer " token)
+               "Dropbox-API-Arg" (str "{\"path\": \"" link "\"}")}}
 
+    ;; public link
     :else
-    {:url (dropbox-dl link)
+    {:url (cond
+            (str/includes? link "dl=0")
+            (str/replace link "dl=0" "dl=1")
+
+            (str/includes? link "?")
+            (str link "&dl=1")
+
+            :else
+            (str link "?dl=1"))
      :method :get
      :headers {}}))
 
 (defn fetch-file!
-  "Downloads file from cloud source to temporary local path."
-  [type {:keys [link token revision-id] :as cred}]
+  "Downloads remote file to temporary local path and returns file location."
+  [src cred]
+  (let [{:keys [link token revision-id refresh-token client-id client-secret]}
+        cred
+        {:keys [url method headers]}
 
-  (if (= type :s3)
-    (str "s3a://" (:bucket cred) "/" (:key cred))
-    (let [{:keys [url method headers]}
-          (case type
-            :gdrive  (gdrive-req link token revision-id)
-            :dropbox (dropbox-req link token revision-id)
-            {:url link :method :get :headers {}})
+        (case src
+          :gdrive
+          (gdrive-req link refresh-token client-id client-secret revision-id)
 
-          dest (str (System/getProperty "java.io.tmpdir")
-                    File/separator
-                    "cloud-raw-"
-                    (UUID/randomUUID)
-                    ".csv")]
+          :dropbox
+          (dropbox-req link token revision-id)
 
-      (log/info {:msg "starting cloud download"
-                 :metric {:type type :url url :dest dest}})
+          {:url link
+           :method :get
+           :headers {}})
 
-      (let [download-start (System/currentTimeMillis)
-            req-builder    (HttpRequest/newBuilder)]
+        dest (str (System/getProperty "java.io.tmpdir") File/separator
+                  "cloud-raw-"
+                  (UUID/randomUUID)
+                  ".csv")]
+    (log/info {:msg "starting cloud download"
+               :metric {:type src
+                        :url url
+                        :dest dest}})
 
-        (.uri req-builder (URI/create url))
-        (.timeout req-builder (Duration/ofSeconds 120))
+    (let [start (System/currentTimeMillis)
+          req-builder (HttpRequest/newBuilder)]
 
-        (when (not (str/blank? token))
-          (.header req-builder "Authorization" (str "Bearer " token)))
+      (.uri req-builder (URI/create url))
+      (.timeout req-builder (Duration/ofSeconds 120))
 
-        (doseq [[k v] headers]
-          (.header req-builder k v))
+      (doseq [[k v] headers]
+        (.header req-builder k v))
 
-        (let [request  (if (= method :post)
-                         (.build
-                          (.POST
-                           req-builder
-                           (java.net.http.HttpRequest$BodyPublishers/noBody)))
-                         (.build (.GET req-builder)))
+      (let [request (if (= method :post)
+                      (.build
+                       (.POST
+                        req-builder
+                        (java.net.http.HttpRequest$BodyPublishers/noBody)))
+                      (.build
+                       (.GET req-builder)))
 
-              response (.send http-client request
-                              (HttpResponse$BodyHandlers/ofInputStream))
-              status   (.statusCode response)]
+            response (.send http-client
+                            request
+                            (HttpResponse$BodyHandlers/ofInputStream))
 
-          (when (or (< status 200) (>= status 300))
-            (throw (ex-info "Cloud download failed"
-                            {:status status :url url :type type})))
+            status (.statusCode response)]
 
-          (with-open [in  (.body response)
-                      out (io/output-stream dest)]
-            (io/copy in out))
+        (when
+         (or (< status 200) (>= status 300))
+          (throw
+           (ex-info "Cloud download failed"
+                    {:status status
+                     :url url
+                     :type src})))
+        (with-open
+         [in (.body response)
+          out (io/output-stream dest)]
+          (io/copy in out))
 
-          (log/info {:msg "download complete"
-                     :metric {:type        type
-                              :bytes       (.length (File. dest))
-                              :duration-ms (- (System/currentTimeMillis)
-                                              download-start)}})))
-
-      (.deleteOnExit (File. dest))
-      dest)))
+        (log/info
+         {:msg "download complete"
+          :metric {:type src
+                   :bytes (.length (File. dest))
+                   :duration-ms (- (System/currentTimeMillis) start)}})))
+    (.deleteOnExit (File. dest))
+    dest))

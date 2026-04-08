@@ -12,7 +12,8 @@ You will need [Leiningen][] 2.0.0 or above installed.
 
 To start a web server for the application, run:
 
-    lein ring server
+    lein uberjar
+    lein run
 
 ## API request body
 
@@ -22,25 +23,27 @@ To start a web server for the application, run:
 {
     "type": "gdrive | dropbox | s3 | gcs | local",
     "format": "csv",
-    "link_type": "public | private",
+    "link-type": "public | private",
     "source": {
         "path": "",
         "url": "",
         "bucket": "",
         "key": "",
         "region": "",
-        "revision_id": "",
-        "version_id": "",
+        "revision-id": "",
+        "version-id": "",
         "generation": ""
     },
     "auth": {
-        "token": "",
-        "access_key": "",
-        "secret_key": "",
-        "project_id": "",
-        "client_email": "",
-        "private_key": ""
-    },
+        "access-key": "",
+        "secret-key": "",
+        "project-id": "",
+        "client-email": "",
+        "private-key": "",
+        "client-id": "",
+        "client-secret": "",
+        "refresh-token": ""
+  },    
     "options": {
         "header": true,
         "delimiter": ","
@@ -50,9 +53,9 @@ To start a web server for the application, run:
 
 Rules:
 - `format` is always `csv`.
-- `link_type = private` requires `auth`.
-- `link_type = public` does not require `auth`.
-- `revision_id`, `version_id`, `generation` are optional.
+- `link-type = private` requires `auth`.
+- `link-type = public` does not require `auth`.
+- `revision-id`, `version-id`, `generation` are optional.
 - Dropbox: public uses `source.url`, private uses `source.path`.
 
 ### GDrive
@@ -63,7 +66,7 @@ Public:
 {
     "type": "gdrive",
     "format": "csv",
-    "link_type": "public",
+    "link-type": "public",
     "source": {
         "url": "https://drive.google.com/file/d/FILE_ID/view?usp=sharing"
     },
@@ -74,20 +77,22 @@ Public:
 }
 ```
 
-Private (optional `revision_id`):
+Private (optional `revision-id`):
 
 ```json
 {
     "type": "gdrive",
     "format": "csv",
-    "link_type": "private",
+    "link-type": "private",
     "source": {
         "url": "https://drive.google.com/file/d/FILE_ID/view?usp=sharing",
-        "revision_id": "REV_ID"
+        "revision-id": "REV-ID"
     },
     "auth": {
-        "token": "GDRIVE_TOKEN"
-    },
+    "client-id": "xxxx",
+    "client-secret": "xxxx",
+    "refresh-token": "xxxx"
+  },
     "options": {
         "header": true,
         "delimiter": ","
@@ -103,7 +108,7 @@ Public:
 {
     "type": "dropbox",
     "format": "csv",
-    "link_type": "public",
+    "link-type": "public",
     "source": {
         "url": "https://www.dropbox.com/s/FILE_ID/customers.csv?dl=0"
     },
@@ -120,12 +125,12 @@ Private:
 {
     "type": "dropbox",
     "format": "csv",
-    "link_type": "private",
+    "link-type": "private",
     "source": {
         "path": "/customers-100000.csv"
     },
     "auth": {
-        "token": "DROPBOX_TOKEN"
+        "token": "DROPBOX-TOKEN"
     },
     "options": {
         "header": true,
@@ -142,7 +147,7 @@ Public (signed or public bucket):
 {
     "type": "s3",
     "format": "csv",
-    "link_type": "public",
+    "link-type": "public",
     "source": {
         "bucket": "my-bucket",
         "key": "transaction.csv",
@@ -155,22 +160,22 @@ Public (signed or public bucket):
 }
 ```
 
-Private (optional `version_id`):
+Private (optional `version-id`):
 
 ```json
 {
     "type": "s3",
     "format": "csv",
-    "link_type": "private",
+    "link-type": "private",
     "source": {
         "bucket": "my-bucket",
         "key": "transaction.csv",
         "region": "ap-south-1",
-        "version_id": "VERSION_ID"
+        "version-id": "VERSION-ID"
     },
     "auth": {
-        "access_key": "S3_ACCESS_KEY",
-        "secret_key": "S3_SECRET_KEY"
+        "access-key": "S3-ACCESS-KEY",
+        "secret-key": "S3-SECRET-KEY"
     },
     "options": {
         "header": true,
@@ -187,7 +192,7 @@ Public:
 {
     "type": "gcs",
     "format": "csv",
-    "link_type": "public",
+    "link-type": "public",
     "source": {
         "bucket": "my-gcs-bucket",
         "key": "data/file.csv"
@@ -205,16 +210,16 @@ Private (optional `generation`):
 {
     "type": "gcs",
     "format": "csv",
-    "link_type": "private",
+    "link-type": "private",
     "source": {
         "bucket": "my-gcs-bucket",
         "key": "data/file.csv",
-        "generation": "GENERATION_ID"
+        "generation": "GENERATION-ID"
     },
     "auth": {
-        "project_id": "GCP_PROJECT_ID",
-        "client_email": "svc@project.iam.gserviceaccount.com",
-        "private_key": "-----BEGIN PRIVATE KEY-----..."
+        "project-id": "GCP-PROJECT-ID",
+        "client-email": "svc@project.iam.gserviceaccount.com",
+        "private-key": "-----BEGIN PRIVATE KEY-----..."
     },
     "options": {
         "header": true,
@@ -229,7 +234,7 @@ Private (optional `generation`):
 {
     "type": "local",
     "format": "csv",
-    "link_type": "public",
+    "link-type": "public",
     "source": {
         "path": "/data/input.csv"
     },
@@ -240,6 +245,3 @@ Private (optional `generation`):
 }
 ```
 
-## License
-
-Copyright © 2026 FIXME

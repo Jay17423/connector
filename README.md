@@ -196,7 +196,8 @@ Private:
     "format": "csv",
     "link-type": "private",
     "source": {
-        "path": "/customers-100000.csv"
+        "path": "/customers-100000.csv",
+        "revision-id":"xxxxx"
     },
     "auth": {
         "token": "DROPBOX-TOKEN"

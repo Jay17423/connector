@@ -22,7 +22,7 @@
   [body]
   (let [{:keys [source auth options type format link-type]
          :or {link-type "public"}} body
-        type-kw    (keyword type)
+        type-kw (keyword type)
         normalized {:type type-kw
                     :format format
                     :link-type (keyword link-type)

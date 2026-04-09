@@ -1,7 +1,7 @@
 (ns connector.dataset-test
   (:require [clojure.test :refer [deftest is]]
             [connector.dataset :as dataset]
-            [connector.http-fetcher :as fetcher]
+            [connector.cloud-fetch :as fetcher]
             [flambo.sql :as fsql]
             [taoensso.timbre :as log]))
 

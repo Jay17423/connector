@@ -7,9 +7,8 @@
             [ring.util.response :refer [response status]]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
-            [taoensso.timbre :as log]
             [connector.logger]
-            [connector.config :as app-config]
+            [taoensso.timbre :as log]
             [connector.spark :refer [session]]
             [connector.dataset :as ds]
             [connector.specs :as spec]
@@ -88,39 +87,49 @@
         (log/info {:msg "Dataset loaded successfully"
                    :metric {:type (:type body)
                             :duration-ms duration}})
-
-        (-> (response {:status "success"
-                       :source (:type body)
-                       :duration-ms duration
-                       :data preview})
-            (status 200)))
+        (status
+         (response
+          {:status "success",
+           :source (:type body),
+           :duration-ms duration,
+           :data preview})
+         200))
 
       (catch AssertionError err
         (let [duration (- (System/currentTimeMillis) start-time)]
           (log/warn {:msg "Invalid request body"
                      :error (.getMessage err)
                      :metric {:duration-ms duration}})
-          (-> (response {:status "error"
-                         :msg "Invalid request body"
-                         :error (.getMessage err)
-                         :duration-ms duration})
-              (status 400))))
-      
+          (status
+           (response
+            {:status "error",
+             :msg "Invalid request body",
+             :error (.getMessage err),
+             :duration-ms duration})
+           400)))
+
       (catch Exception err
-        (let [duration (- (System/currentTimeMillis) start-time)]
-          (log/error {:msg "Dataset load failed"
-                      :error (.getMessage err)
-                      :type (-> err .getClass .getName)
-                      :metric {:duration-ms duration}}) 
-          (-> (response {:status "error"
-                         :msg "Internal server error"
-                         :duration-ms duration})
-              (status 500)))))))
+        (let [duration (- (System/currentTimeMillis) start-time)
+              err-data (ex-data err)]
+          (log/error {:msg    "Dataset load failed"
+                      :error  (.getMessage err)
+                      :status (:status err-data)
+                      :source (:type err-data)
+                      :url    (:url err-data)
+                      :metric {:duration-ms duration}})
+          (status (response
+                   {:status "error",
+                    :msg
+                    (if (= 401 (:status err-data))
+                      "Authentication failed - token expired"
+                      "Internal server error"),
+                    :duration-ms duration})
+                  (if (= 401 (:status err-data)) 401 500)))))))
 
 (defroutes app-routes
   "Defines API routes."
   (POST "/data-load" [] load-data)
-  (route/not-found (-> (response {:error "NOT_FOUND"}) (status 404))))
+  (route/not-found (status (response {:error "NOT_FOUND"}) 404)))
 
 (def app
   "Ring application with JSON middleware."
@@ -133,7 +142,8 @@
   []
   (try
     (log/info {:msg "Starting connector service"})
-    (app-config/load-config! "config/config.edn")
+    (cfg/populate-from-file "config/config.edn")
+    (cfg/verify)
     (mount/start)
     (log/info {:msg "Starting http server"
                :metric {:port (cfg/get :server :port)}})

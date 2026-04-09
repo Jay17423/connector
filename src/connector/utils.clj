@@ -3,7 +3,7 @@
    connector modules."
   (:require [flambo.sql :as fsql]))
 
-(defn dataset->preview 
+(defn dataset->preview
   "Converts first 10 rows of Spark Dataset to a list of maps."
   [dataset]
   (let [columns (seq (.columns dataset))]

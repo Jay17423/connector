@@ -1,7 +1,6 @@
 (ns connector.dataset
   "Loads datasets into Spark using production-safe CSV options."
-  (:require [flambo.sql :as fsql]
-            [connector.http-fetcher :as fetcher]
+  (:require [connector.cloud-fetch :as fetcher]
             [taoensso.timbre :as log]
             [clojure.string :as str]))
 
@@ -36,7 +35,6 @@
   (let [hconf (-> spark
                   .sparkContext
                   .hadoopConfiguration)]
-    
     (when project-id
       (.set hconf "fs.gs.project.id" project-id))
 
@@ -103,17 +101,20 @@
                :metric {:type (:type config)
                         :path path}})
     (try
-      (fsql/read-csv spark path
-                     :header (:header opts)
-                     :delimiter (:delimiter opts)
-                     :mode "PERMISSIVE"
-                     :nullValue ""
-                     :ignoreLeadingWhiteSpace true
-                     :ignoreTrailingWhiteSpace true
-                     :columnNameOfCorruptRecord "_corrupt_record")
+      (-> spark
+          .read
+          (.format "csv")
+          (.option "header" (if (:header opts) "true" "false"))
+          (.option "delimiter" (:delimiter opts))
+          (.option "mode" "PERMISSIVE")
+          (.option "nullValue" "")
+          (.option "ignoreLeadingWhiteSpace" "true")
+          (.option "ignoreTrailingWhiteSpace" "true")
+          (.option "columnNameOfCorruptRecord" "_corrupt_record")
+          (.load path))
       (catch Exception err
         (throw (ex-info "Failed to read dataset"
                         {:type  (:type config)
                          :path  path
-                         :cause (.getMessage err)}
+                         :error (.getMessage err)}
                         err))))))

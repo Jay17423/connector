@@ -1,4 +1,4 @@
-(ns connector.http-fetcher
+(ns connector.cloud-fetch
   "Provides HTTP file download utilities for GDrive, Dropbox, and public URLs."
   (:require
    [clojure.java.io :as io]
@@ -39,11 +39,11 @@
                   "&refresh_token=" refresh-token
                   "&grant_type=refresh_token")
         req (-> (HttpRequest/newBuilder)
-                 (.uri (URI/create "https://oauth2.googleapis.com/token"))
-                 (.timeout (Duration/ofSeconds 30))
-                 (.header "Content-Type" "application/x-www-form-urlencoded")
-                 (.POST (java.net.http.HttpRequest$BodyPublishers/ofString body))
-                 (.build))
+                (.uri (URI/create "https://oauth2.googleapis.com/token"))
+                (.timeout (Duration/ofSeconds 30))
+                (.header "Content-Type" "application/x-www-form-urlencoded")
+                (.POST (java.net.http.HttpRequest$BodyPublishers/ofString body))
+                (.build))
         res (.send http-client req (HttpResponse$BodyHandlers/ofString))]
     (if (= 200 (.statusCode res))
       (second (re-find #"\"access_token\"\s*:\s*\"([^\"]+)\"" (.body res)))
@@ -133,7 +133,7 @@
 
     (let [start (System/currentTimeMillis)
           req-builder (HttpRequest/newBuilder)]
-      
+
       (.uri req-builder (URI/create url))
       (.timeout req-builder (Duration/ofSeconds 120))
 

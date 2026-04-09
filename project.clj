@@ -30,15 +30,16 @@
                  [com.fasterxml.jackson.core/jackson-core "2.15.2"]
                  [com.fasterxml.jackson.core/jackson-databind "2.15.2"]
                  [com.fasterxml.jackson.core/jackson-annotations "2.15.2"]
-                 [com.fasterxml.jackson.module/jackson-module-scala_2.12 "2.15.2"] 
+                 [com.fasterxml.jackson.module/jackson-module-scala_2.12 "2.15.2"]
                  [org.apache.hadoop/hadoop-aws "3.3.4"]
-                 [com.amazonaws/aws-java-sdk-bundle "1.12.262"] 
+                 [com.amazonaws/aws-java-sdk-bundle "1.12.262"]
                  [com.google.cloud.bigdataoss/gcs-connector "hadoop3-2.2.11"]]
 
   :plugins [[lein-ring "0.12.5"]
             [lein-cljfmt "0.9.2"]
             [lein-bikeshed "0.5.2"]
-            [jonase/eastwood "1.4.3"]]
+            [jonase/eastwood "1.4.3"]
+            [lein-kibit "0.1.8"]]
 
   :profiles
   {:dev {:dependencies

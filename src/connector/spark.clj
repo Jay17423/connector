@@ -59,8 +59,7 @@
   [spark]
   (try
     (log/info {:msg "Spark warmup starting"})
-    (-> (sql/create-dataset spark [1 2 3 4])
-        (sql/count))
+    (sql/count (sql/create-dataset spark [1 2 3 4]))
     (log/info {:msg "Spark warmup completed"})
     spark
     (catch Exception err
@@ -76,7 +75,11 @@
   (let [spark (create-session)]
     (warmup-spark spark)
     spark)
-  
   :stop
-  (when session
-    (.stop session)))
+  (try
+    (when session
+      (.stop session))
+    (catch Exception e
+      (log/error
+       {:msg "Error while stopping Spark session"
+        :error (.getMessage e)}))))

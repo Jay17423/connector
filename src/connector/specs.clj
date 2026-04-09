@@ -32,9 +32,7 @@
 (s/def ::delimiter string?)
 
 (s/def ::options
-  (s/keys
-   :opt-un
-   [::header ::delimiter]))
+  (s/keys :opt-un [::header ::delimiter]))
 
 (s/def ::source
   (s/keys

@@ -12,7 +12,7 @@ Supported source types:
 
 ## Prerequisites
 
-- JDK 17
+- JDK 11 or higher
 - Leiningen 2.0.0+
 
 Verify Java version:
@@ -21,7 +21,8 @@ Verify Java version:
 java -version
 ```
 
-Expected major version is 17.
+Minimum supported Java version is 11.
+Recommended Java version is 17.
 
 Install Leiningen:
 - https://github.com/technomancy/leiningen

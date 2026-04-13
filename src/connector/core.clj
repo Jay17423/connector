@@ -17,7 +17,7 @@
             [connector.utils :as util]))
 
 (defn normalize-body
-  "Creates the config from the body. "
+  "Creates the common config for all sources from the body. "
   [body]
   (let [{:keys [source auth options type format link-type]
          :or {link-type "public"}} body
@@ -80,7 +80,7 @@
                  :metric {:type (:type body)}})
 
       (let [config (normalize-body body)
-            dataset (ds/read-dataset session config)
+            dataset (ds/read-dataset session config) 
             duration (- (System/currentTimeMillis) start-time)
             preview (util/dataset->preview dataset)]
 
@@ -111,18 +111,17 @@
       (catch Exception err
         (let [duration (- (System/currentTimeMillis) start-time)
               err-data (ex-data err)]
-          (log/error {:msg    "Dataset load failed"
-                      :error  (.getMessage err)
+          (log/error {:msg "Dataset load failed"
+                      :error (.getMessage err)
                       :status (:status err-data)
                       :source (:type err-data)
-                      :url    (:url err-data)
+                      :url (:url err-data)
                       :metric {:duration-ms duration}})
           (status (response
                    {:status "error",
-                    :msg
-                    (if (= 401 (:status err-data))
-                      "Authentication failed - token expired"
-                      "Internal server error"),
+                    :msg (if (= 401 (:status err-data))
+                           "Authentication failed - token expired"
+                           "Internal server error"),
                     :duration-ms duration})
                   (if (= 401 (:status err-data)) 401 500)))))))
 

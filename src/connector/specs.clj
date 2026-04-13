@@ -61,8 +61,8 @@
 
 (defn- require-fields
   "Ensures required keys exist and contain valid string values."
-  [m ks]
-  (every? #(present? (get m %)) ks))
+  [data required-keys]
+  (every? #(present? (get data %)) required-keys))
 
 (defn- valid-source?
   "Validates source configuration and required credentials based on type."
@@ -108,6 +108,5 @@
 (defn validate-body!
   "Validates request body against spec and throws AssertionError."
   [body]
-  (when-not (s/valid? ::valid-body body)
-    (throw (AssertionError. (s/explain-str ::valid-body body))))
+  {:pre [(s/valid? ::valid-body body)]}
   body)

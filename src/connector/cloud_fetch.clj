@@ -56,6 +56,7 @@
   [link refresh-token client-id client-secret revision-id]
   (let [id (gdrive-id link)]
     (cond
+      ;; Revision download
       revision-id
       (let [token (refresh-access-token refresh-token client-id client-secret)]
         {:url (str "https://www.googleapis.com/drive/v3/files/" id
@@ -104,67 +105,86 @@
      :method :get
      :headers {}}))
 
-(defn fetch-file!
-  "Downloads remote file to a temporary local path and returns the file
-   location."
-  [src cred]
-  (let [{:keys [link token revision-id refresh-token client-id client-secret]}
-        cred
-        {:keys [url method headers]}
-        (case src
-          :gdrive
-          (gdrive-req link refresh-token client-id client-secret revision-id)
+(defn- build-request
+  "Creates HttpRequest based on method, url and headers."
+  [{:keys [url method headers]}]
+  (let [builder (-> (HttpRequest/newBuilder)
+                    (.uri (URI/create url))
+                    (.timeout (Duration/ofSeconds 120)))]
+    (doseq [[k v] headers]
+      (.header builder k v))
 
-          :dropbox
-          (dropbox-req link token revision-id)
+    (if (= method :post)
+      (.build
+       (.POST builder
+              (java.net.http.HttpRequest$BodyPublishers/noBody)))
+      (.build (.GET builder)))))
 
-          {:url link :method :get :headers {}})
-
-        dest (str (System/getProperty "java.io.tmpdir") File/separator
+(defn- tmp-destination
+  "Generates temporary file path."
+  []
+  (let [path (str (System/getProperty "java.io.tmpdir")
+                  File/separator
                   "cloud-raw-"
                   (UUID/randomUUID)
                   ".csv")]
-    (.deleteOnExit (File. dest))
+    (.deleteOnExit (File. path))
+    path))
+
+(defn- resolve-request*
+  "Resolves request configuration based on source type."
+  [src cred]
+  (let [{:keys [link token revision-id refresh-token client-id client-secret]}
+        cred]
+
+    (case src
+      :gdrive
+      (gdrive-req link refresh-token client-id client-secret revision-id)
+
+      :dropbox
+      (dropbox-req link token revision-id)
+
+      {:url link
+       :method :get
+       :headers {}})))
+
+(defn- download!
+  "Executes HTTP request and writes response to file."
+  [request dest src url]
+  (let [start (System/currentTimeMillis)
+        response (.send http-client
+                        request
+                        (HttpResponse$BodyHandlers/ofInputStream))
+        status (.statusCode response)]
+
+    (when-not (<= 200 status 299)
+      (throw
+       (ex-info "Cloud download failed"
+                {:status status
+                 :url url
+                 :type src})))
+
+    (with-open [in  (.body response)
+                out (io/output-stream dest)]
+      (io/copy in out))
+
+    (log/info {:msg "Download complete"
+               :metric {:type src
+                        :bytes (.length (File. dest))
+                        :duration-ms (- (System/currentTimeMillis) start)}})))
+
+(defn fetch-file!
+  "Downloads remote file to a temporary local path."
+  [src cred]
+  (let [{:keys [url method headers]} (resolve-request* src cred)
+        dest (tmp-destination)
+        request (build-request {:url url
+                                :method method
+                                :headers headers})]
 
     (log/info {:msg "Starting cloud download"
                :metric {:type src
                         :url  url
                         :dest dest}})
-
-    (let [start (System/currentTimeMillis)
-          req-builder (HttpRequest/newBuilder)]
-
-      (.uri req-builder (URI/create url))
-      (.timeout req-builder (Duration/ofSeconds 120))
-
-      (doseq [[k v] headers]
-        (.header req-builder k v))
-
-      (let [request (if (= method :post)
-                      (.build
-                       (.POST
-                        req-builder
-                        (java.net.http.HttpRequest$BodyPublishers/noBody)))
-                      (.build (.GET req-builder)))
-            response (.send http-client
-                            request
-                            (HttpResponse$BodyHandlers/ofInputStream))
-            status (.statusCode response)]
-
-        (when (or (< status 200) (>= status 300))
-          (throw
-           (ex-info "Cloud download failed"
-                    {:status status
-                     :url url
-                     :type src})))
-
-        (with-open [in (.body response)
-                    out (io/output-stream dest)]
-          (io/copy in out))
-
-        (log/info {:msg "Download complete"
-                   :metric {:type src
-                            :bytes (.length (File. dest))
-                            :duration-ms
-                            (- (System/currentTimeMillis) start)}})))
+    (download! request dest src url)
     dest))

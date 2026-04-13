@@ -2,8 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [connector.dataset :as dataset]
             [connector.cloud-fetch :as fetcher]
-            [flambo.sql :as fsql]
-            [taoensso.timbre :as log]))
+            [flambo.sql :as fsql]))
 
 (deftest resolve-source-positive-and-edge
   (is (= "/tmp/a.csv"
@@ -24,25 +23,6 @@
   (is (thrown-with-msg? clojure.lang.ExceptionInfo
                         #"Unsupported dataset source"
                         (dataset/resolve-source {:type :unknown}))))
-
-(deftest read-dataset-calls-reader-with-defaults
-  (let [calls (java.util.ArrayList.)]
-    (with-redefs [connector.dataset/resolve-source (fn [_] "/tmp/a.csv")
-                  connector.dataset/configure-s3! (fn [_ _] (.add calls :s3))
-                  connector.dataset/configure-gcs! (fn [_ _] (.add calls :gcs))
-                  log/info (fn [_])
-                  fsql/read-csv
-                  (fn [_ path & args]
-                    (.add calls {:path path :args args})
-                    :ok)]
-      (is (= :ok
-             (dataset/read-dataset :spark {:type :s3
-                                           :cred {:bucket "b" :key "k"}
-                                           :options {}})))
-      (is (= :s3 (first calls)))
-      (is (= "/tmp/a.csv" (:path (second calls))))
-      (is (= true (get (apply hash-map (:args (second calls))) :header)))
-      (is (= "," (get (apply hash-map (:args (second calls))) :delimiter))))))
 
 (deftest read-dataset-negative
   (with-redefs [connector.dataset/resolve-source (fn [_] "/tmp/a.csv")

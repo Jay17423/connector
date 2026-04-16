@@ -15,7 +15,7 @@
     (-> (fs/session-builder)
         (fs/master (cfg/get :spark :app :master-url))
         (fs/app-name (cfg/get :spark :app :name))
-        ;; fat jar classpath
+        ;; jar classpath
         (fs/config
          "spark.executor.extraClassPath"
          (str (System/getProperty "user.dir")

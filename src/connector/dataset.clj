@@ -7,51 +7,40 @@
 (defn configure-s3!
   "Applies S3 credentials and settings to Spark Hadoop configuration."
   [spark {:keys [access-key secret-key region version-id]}]
-  (let [hconf (-> spark
-                  .sparkContext
-                  .hadoopConfiguration)]
-    (when access-key
-      (.set hconf "fs.s3a.access.key" access-key))
-    (when secret-key
-      (.set hconf "fs.s3a.secret.key" secret-key))
-    (when region
-      (.set hconf "fs.s3a.endpoint" (str "s3." region ".amazonaws.com")))
+  (let [hconf (-> spark .sparkContext .hadoopConfiguration)]
+    (.set hconf "fs.s3a.access.key" access-key)
+    (.set hconf "fs.s3a.secret.key" secret-key)
+    (.set hconf "fs.s3a.endpoint" (str "s3." region ".amazonaws.com"))
+    ;; Validation because version-id is optional in private and s3 can't accept
+    ;; null value
     (when version-id
       (.set hconf "fs.s3a.version.id" version-id))))
 
 (defn configure-gcs!
   "Configures GCS authentication and filesystem settings in Spark."
-  [spark {:keys [project-id client-email private-key]}]
+  [spark {:keys [project-id client-email private-key generation]}]
+  (let [hconf    (-> spark .sparkContext .hadoopConfiguration)
+        json-key (json/generate-string
+                  {:type "service_account"
+                   :project_id project-id
+                   :private_key_id "placeholder"
+                   :private_key private-key
+                   :client_email client-email
+                   :client_id "placeholder"
+                   :auth_uri "https://accounts.google.com/o/oauth2/auth"
+                   :token_uri "https://oauth2.googleapis.com/token"})
+        tmp-file (java.io.File/createTempFile "gcs-key-" ".json")]
 
-  (let [hconf (-> spark
-                  .sparkContext
-                  .hadoopConfiguration)]
-
-    (when project-id
-      (.set hconf "fs.gs.project.id" project-id))
-
-    (when (and project-id client-email private-key)
-
-      ;; generate JSON file
-      (let [json-key
-            (json/generate-string
-             {:type "service_account"
-              :project_id project-id
-              :private_key_id "placeholder"
-              :private_key private-key
-              :client_email client-email
-              :client_id "placeholder"
-              :auth_uri "https://accounts.google.com/o/oauth2/auth"
-              :token_uri "https://oauth2.googleapis.com/token"})
-
-            tmp-file
-            (java.io.File/createTempFile "gcs-key-" ".json")]
-
-        (.deleteOnExit tmp-file)
-        (spit (.getAbsolutePath tmp-file) json-key)
-        (.set hconf "fs.gs.auth.type" "SERVICE_ACCOUNT_JSON_KEYFILE")
-        (.set hconf "fs.gs.auth.service.account.json.keyfile"
-              (.getAbsolutePath tmp-file))))))
+    (.deleteOnExit tmp-file)
+    (spit (.getAbsolutePath tmp-file) json-key)
+    (.set hconf "fs.gs.project.id" project-id)
+    (.set hconf "fs.gs.auth.type" "SERVICE_ACCOUNT_JSON_KEYFILE")
+    (.set hconf "fs.gs.auth.service.account.json.keyfile"
+          (.getAbsolutePath tmp-file))
+    ;; generation is optional in GCS, Hadoop GCS connector cant accept null 
+    ;;value
+    (when generation
+      (.set hconf "fs.gs.generation" (str generation)))))
 
 (defn resolve-source
   "Resolves dataset source path. Returns just the path string."
@@ -91,7 +80,7 @@
   (let [opts (merge {:header true :delimiter ","} options)
         path (resolve-source config)]
 
-    (log/info {:msg "Reading dataset into Spark"
+    (log/info {:msg    "Reading dataset into Spark"
                :metric {:type (:type config)
                         :path path}})
     (try
@@ -104,7 +93,6 @@
           (.option "nullValue" "")
           (.option "ignoreLeadingWhiteSpace" "true")
           (.option "ignoreTrailingWhiteSpace" "true")
-          (.option "columnNameOfCorruptRecord" "_corrupt_record")
           (.load path))
 
       (catch Exception err

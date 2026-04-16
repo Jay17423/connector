@@ -1,6 +1,20 @@
-{:server
+{:env
+ {:description "Runtime environment"
+  :type :keyword
+  :required true}
+
+ :logging
+ {:dir {:description "Log directory"
+        :type :string
+        :default "logs"}
+
+  :file {:description "Log file name"
+         :type :string
+         :default "app.log"}}
+
+ :server
  {:port {:description "HTTP server port"
-         :type :long 
+         :type :long
          :default 3000}}
 
  :spark

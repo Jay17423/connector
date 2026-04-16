@@ -7,7 +7,7 @@
             [ring.util.response :refer [response status]]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
-            [connector.logger]
+            [connector.logger :as logger]
             [taoensso.timbre :as log]
             [connector.spark :refer [session]]
             [connector.dataset :as ds]
@@ -80,7 +80,7 @@
                  :metric {:type (:type body)}})
 
       (let [config (normalize-body body)
-            dataset (ds/read-dataset session config) 
+            dataset (ds/read-dataset session config)
             duration (- (System/currentTimeMillis) start-time)
             preview (util/dataset->preview dataset)]
 
@@ -140,9 +140,10 @@
   "Starts application and HTTP server."
   []
   (try
-    (log/info {:msg "Starting connector service"})
     (cfg/populate-from-file "config/config.edn")
     (cfg/verify)
+    (logger/configure-logger!)
+    (log/info {:msg "Starting connector service"})
     (mount/start)
     (log/info {:msg "Starting http server"
                :metric {:port (cfg/get :server :port)}})

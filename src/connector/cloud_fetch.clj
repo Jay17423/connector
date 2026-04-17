@@ -53,10 +53,9 @@
 (defn gdrive-req
   "Builds Google Drive request supporting public, private, and revision
    download."
-  [link refresh-token client-id client-secret revision-id]
+  [{:keys [link refresh-token client-id client-secret revision-id]}]
   (let [id (gdrive-id link)]
     (cond
-      ;; Revision download
       revision-id
       (let [token (refresh-access-token refresh-token client-id client-secret)]
         {:url (str "https://www.googleapis.com/drive/v3/files/" id
@@ -64,14 +63,12 @@
          :method  :get
          :headers {"Authorization" (str "Bearer " token)}})
 
-      ;; Private file
       (and refresh-token client-id client-secret)
       (let [token (refresh-access-token refresh-token client-id client-secret)]
         {:url (str "https://www.googleapis.com/drive/v3/files/" id "?alt=media")
          :method :get
          :headers {"Authorization" (str "Bearer " token)}})
 
-      ;; Public file
       :else
       {:url (str "https://drive.google.com/uc?export=download&id=" id)
        :method :get
@@ -80,23 +77,20 @@
 (defn dropbox-req
   "Builds Dropbox request supporting public link, private token, and revision
    download."
-  [link token revision-id]
+  [{:keys [link token revision-id]}]
   (cond
-    ;; Revision download
     revision-id
     {:url  "https://content.dropboxapi.com/2/files/download"
      :method :post
      :headers {"Authorization" (str "Bearer " token)
                "Dropbox-API-Arg" (str "{\"path\": \"rev:" revision-id "\"}")}}
 
-    ;; Private file
     token
     {:url "https://content.dropboxapi.com/2/files/download"
      :method :post
      :headers {"Authorization" (str "Bearer " token)
                "Dropbox-API-Arg" (str "{\"path\": \"" link "\"}")}}
 
-    ;; Public link
     :else
     {:url (cond
             (str/includes? link "dl=0") (str/replace link "dl=0" "dl=1")
@@ -134,19 +128,16 @@
 (defn- resolve-request*
   "Resolves request configuration based on source type."
   [src cred]
-  (let [{:keys [link token revision-id refresh-token client-id client-secret]}
-        cred]
+  (case src
+    :gdrive
+    (gdrive-req cred)
 
-    (case src
-      :gdrive
-      (gdrive-req link refresh-token client-id client-secret revision-id)
+    :dropbox
+    (dropbox-req cred)
 
-      :dropbox
-      (dropbox-req link token revision-id)
-
-      {:url link
-       :method :get
-       :headers {}})))
+    {:url (:link cred)
+     :method :get
+     :headers {}}))
 
 (defn- download!
   "Executes HTTP request and writes response to file."

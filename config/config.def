@@ -4,13 +4,17 @@
   :required true}
 
  :logging
- {:dir {:description "Log directory"
-        :type :string
-        :default "logs"}
+ {:dir  {:description "Log directory"
+         :type :string
+         :default "logs"}
 
   :file {:description "Log file name"
          :type :string
-         :default "app.log"}}
+         :default "app.log"}
+
+  :level {:description "Log level"
+          :type :keyword
+          :default  :info}}
 
  :server
  {:port {:description "HTTP server port"
@@ -20,8 +24,8 @@
  :spark
  {:app
   {:name {:description "Spark application name"
-          :type :string
-          :required true}
+                :type :string
+                :required true}
 
    :master-url {:description "Spark master URL"
                 :type :string

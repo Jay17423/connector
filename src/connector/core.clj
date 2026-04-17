@@ -14,7 +14,8 @@
             [connector.specs :as spec]
             [omniconf.core :as cfg]
             [clojure.string :as str]
-            [connector.utils :as util]))
+            [connector.utils :as util]
+            [connector.middleware :as mw]))
 
 (defn normalize-body
   "Creates the common config for all sources from the body. "
@@ -34,7 +35,6 @@
       :gdrive
       (assoc normalized
              :cred {:link (:url source)
-                    :token (:token auth)
                     :refresh-token (:refresh-token auth)
                     :client-id (:client-id auth)
                     :client-secret (:client-secret auth)
@@ -72,58 +72,24 @@
 (defn load-data
   "Handles dataset load request."
   [req]
-  (let [start-time (System/currentTimeMillis)
-        body (:body req)]
-    (try
-      (spec/validate-body! body)
-      (log/info {:msg "Dataset load request"
-                 :metric {:type (:type body)}})
+  ((spec/validate-body! (:body req))
+   (log/info {:msg "Dataset load request"
+              :metric {:type (:type (:body req))}})
+   (let [config (normalize-body (:body req))
+         dataset (ds/read-dataset session config)
+         duration (- (System/currentTimeMillis) (:start-time req))
+         preview (util/dataset->preview dataset)]
 
-      (let [config (normalize-body body)
-            dataset (ds/read-dataset session config)
-            duration (- (System/currentTimeMillis) start-time)
-            preview (util/dataset->preview dataset)]
-
-        (log/info {:msg "Dataset loaded successfully"
-                   :metric {:type (:type body)
-                            :duration-ms duration}})
-        (status
-         (response
-          {:status "success",
-           :source (:type body),
-           :duration-ms duration,
-           :data preview})
-         200))
-
-      (catch AssertionError err
-        (let [duration (- (System/currentTimeMillis) start-time)]
-          (log/warn {:msg "Invalid request body"
-                     :error (.getMessage err)
-                     :metric {:duration-ms duration}})
-          (status
-           (response
-            {:status "error",
-             :msg "Invalid request body",
-             :error (.getMessage err),
-             :duration-ms duration})
-           400)))
-
-      (catch Exception err
-        (let [duration (- (System/currentTimeMillis) start-time)
-              err-data (ex-data err)]
-          (log/error {:msg "Dataset load failed"
-                      :error (.getMessage err)
-                      :status (:status err-data)
-                      :source (:type err-data)
-                      :url (:url err-data)
-                      :metric {:duration-ms duration}})
-          (status (response
-                   {:status "error",
-                    :msg (if (= 401 (:status err-data))
-                           "Authentication failed - token expired"
-                           "Internal server error"),
-                    :duration-ms duration})
-                  (if (= 401 (:status err-data)) 401 500)))))))
+     (log/info {:msg "Dataset loaded successfully"
+                :metric {:type (:type (:body req))
+                         :duration-ms duration}})
+     (status
+      (response
+       {:status "success",
+        :source (:type (:body req)),
+        :duration-ms duration,
+        :data preview})
+      200))))
 
 (defroutes app-routes
   "Defines API routes."
@@ -133,6 +99,8 @@
 (def app
   "Ring application with JSON middleware."
   (-> app-routes
+      (mw/wrap-error-handler)
+      (mw/wrap-request-timer)
       (wrap-json-body {:keywords? true})
       wrap-json-response))
 
